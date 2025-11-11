@@ -26,6 +26,9 @@ export default function Navbar() {
             <a href="#" className="text-white/70 hover:text-white transition">
               Docs
             </a>
+            <a href="/login" className="text-white/70 hover:text-white transition">
+              Login
+            </a>
             <button className="px-6 py-2 bg-yellow-500 hover:bg-yellow-600 text-black font-semibold rounded-lg transition glow-border">
               Get Started
             </button>
@@ -48,6 +51,9 @@ export default function Navbar() {
             </a>
             <a href="#" className="block text-white/70 hover:text-white">
               Docs
+            </a>
+            <a href="/login" className="block text-white/70 hover:text-white">
+              Login
             </a>
             <button className="w-full px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-black font-semibold rounded-lg transition">
               Get Started

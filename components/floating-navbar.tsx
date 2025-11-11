@@ -52,6 +52,10 @@ export default function FloatingNavbar({
     },
   ]
 
+  // Only show visible steps; collapse container when single icon
+  const visibleSteps = steps.filter((s) => s.show !== false)
+  const compact = visibleSteps.length <= 1
+
   return (
     <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50">
       <motion.div
@@ -59,10 +63,10 @@ export default function FloatingNavbar({
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.3, duration: 0.6 }}
       >
-        <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-full px-8 py-3 shadow-2xl">
-          <div className="flex items-center gap-6">
+        <div className={`rounded-full shadow-2xl ${compact ? "px-0 py-0 bg-transparent border-0 backdrop-blur-0" : "px-8 py-3 bg-black/50 border border-white/10 backdrop-blur-md"}`}>
+          <div className={`flex items-center ${compact ? "gap-0" : "gap-6"}`}>
             <AnimatePresence mode="wait">
-              {steps.map((step, index) => (
+              {visibleSteps.map((step, index) => (
                 <motion.div
                   key={step.id}
                   initial={{ opacity: 0, scale: 0.8 }}
@@ -75,7 +79,7 @@ export default function FloatingNavbar({
                     className={`relative flex items-center justify-center w-10 h-10 rounded-full transition-all duration-300 ${
                       currentStep === step.id
                         ? `bg-gradient-to-r ${step.color} shadow-lg shadow-emerald-500/40`
-                        : "bg-white/5 hover:bg-white/10 text-white/60 hover:text-white/80"
+                        : "bg-black/30 hover:bg-black/40 text-white/80 hover:text-white"
                     }`}
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.9 }}

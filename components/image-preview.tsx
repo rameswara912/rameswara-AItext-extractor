@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState, useRef, useEffect } from "react"
 import Image from "next/image"
-import { ZoomIn, ZoomOut, RotateCcw } from "lucide-react"
+import { ZoomIn, ZoomOut, RotateCcw, FileText } from "lucide-react"
 import { motion } from "framer-motion"
 
 interface ImagePreviewProps {
@@ -130,67 +130,90 @@ export default function ImagePreview({ imageUrl }: ImagePreviewProps) {
         onMouseDown={handleMouseDown}
         onTouchStart={handleTouchStart}
       >
-        {/* Image Container */}
-        <motion.div
-          ref={imageRef}
-          className="w-full h-full flex items-center justify-center cursor-grab active:cursor-grabbing"
-          animate={{
-            scale: zoom,
-            x: position.x,
-            y: position.y,
-          }}
-          transition={{
-            type: "spring",
-            stiffness: 400,
-            damping: 60,
-          }}
-        >
-          {imageUrl && (
-            <Image
-              src={imageUrl || "/placeholder.svg"}
-              alt="Uploaded table"
-              width={600}
-              height={800}
-              className="max-w-full max-h-full object-contain select-none"
-              draggable={false}
-            />
-          )}
-        </motion.div>
+        {/* Image/PDF Container */}
+        {imageUrl && imageUrl.startsWith("data:application/pdf") ? (
+          <div className="w-full h-full">
+            <object data={imageUrl} type="application/pdf" className="w-full h-full">
+              <div className="w-full h-full flex items-center justify-center">
+                <div className="glass p-6 rounded-xl border border-white/10 text-center">
+                  <div className="flex justify-center mb-3">
+                    <div className="p-3 bg-yellow-500/20 rounded-full">
+                      <FileText className="w-8 h-8 text-yellow-400" />
+                    </div>
+                  </div>
+                  <div className="text-white font-semibold">PDF Preview Unsupported</div>
+                  <div className="text-white/70 text-sm mt-1">Your browser cannot display this PDF inline.</div>
+                  <a href={imageUrl} target="_blank" rel="noreferrer" className="mt-3 inline-block px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-black rounded-lg font-semibold">Open PDF in new tab</a>
+                </div>
+              </div>
+            </object>
+          </div>
+        ) : (
+          <motion.div
+            ref={imageRef}
+            className="w-full h-full flex items-center justify-center cursor-grab active:cursor-grabbing"
+            animate={{
+              scale: zoom,
+              x: position.x,
+              y: position.y,
+            }}
+            transition={{
+              type: "spring",
+              stiffness: 400,
+              damping: 60,
+            }}
+          >
+            {imageUrl && (
+              <Image
+                src={imageUrl || "/placeholder.svg"}
+                alt="Uploaded table"
+                width={600}
+                height={800}
+                className="max-w-full max-h-full object-contain select-none"
+                draggable={false}
+              />
+            )}
+          </motion.div>
+        )}
 
-        {/* Zoom Controls - Top Right */}
-        <div className="absolute top-4 right-4 flex gap-2 z-10">
-          <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={handleZoomIn}
-            disabled={zoom >= MAX_ZOOM}
-            className="p-2 bg-yellow-500 hover:bg-yellow-600 disabled:bg-gray-600 text-black rounded-lg transition backdrop-blur-sm"
-          >
-            <ZoomIn className="w-5 h-5" />
-          </motion.button>
-          <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={handleZoomOut}
-            disabled={zoom <= MIN_ZOOM}
-            className="p-2 bg-yellow-500 hover:bg-yellow-600 disabled:bg-gray-600 text-black rounded-lg transition backdrop-blur-sm"
-          >
-            <ZoomOut className="w-5 h-5" />
-          </motion.button>
-          <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={handleReset}
-            className="p-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg transition backdrop-blur-sm"
-          >
-            <RotateCcw className="w-5 h-5" />
-          </motion.button>
-        </div>
+        {/* Zoom Controls - Top Right (images only) */}
+        {!imageUrl?.startsWith("data:application/pdf") && (
+          <div className="absolute top-4 right-4 flex gap-2 z-10">
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={handleZoomIn}
+              disabled={zoom >= MAX_ZOOM}
+              className="p-2 bg-yellow-500 hover:bg-yellow-600 disabled:bg-gray-600 text-black rounded-lg transition backdrop-blur-sm"
+            >
+              <ZoomIn className="w-5 h-5" />
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={handleZoomOut}
+              disabled={zoom <= MIN_ZOOM}
+              className="p-2 bg-yellow-500 hover:bg-yellow-600 disabled:bg-gray-600 text-black rounded-lg transition backdrop-blur-sm"
+            >
+              <ZoomOut className="w-5 h-5" />
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={handleReset}
+              className="p-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg transition backdrop-blur-sm"
+            >
+              <RotateCcw className="w-5 h-5" />
+            </motion.button>
+          </div>
+        )}
 
-        {/* Zoom Info */}
-        <div className="absolute bottom-4 left-4 px-3 py-2 bg-black/40 backdrop-blur-sm rounded-lg border border-white/10 text-white text-xs font-medium">
-          {Math.round(zoom * 100)}%
-        </div>
+        {/* Zoom Info (images only) */}
+        {!imageUrl?.startsWith("data:application/pdf") && (
+          <div className="absolute bottom-4 left-4 px-3 py-2 bg-black/40 backdrop-blur-sm rounded-lg border border-white/10 text-white text-xs font-medium">
+            {Math.round(zoom * 100)}%
+          </div>
+        )}
       </div>
 
       {/* Info Text */}
