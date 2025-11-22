@@ -1,15 +1,16 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import Hero from "@/components/hero"
 import SelectionPanel from "@/components/selection-panel"
 import ExtractedDataPanel from "@/components/extracted-data-panel"
 import FloatingNavbar from "@/components/floating-navbar"
+import HistorySidebar from "@/components/history-sidebar"
 import dynamic from "next/dynamic"
-const HistorySidebar = dynamic(() => import("@/components/history-sidebar"), { ssr: false })
 import { History } from "lucide-react"
 const AuthButton = dynamic(() => import("@/components/auth-button"), { ssr: false })
 import { getSupabaseClient } from "@/lib/supabase"
+import { toast } from "sonner"
 
 export default function Home() {
   const [uploadedImage, setUploadedImage] = useState<string | null>(null)
@@ -22,10 +23,14 @@ export default function Home() {
   const [extractError, setExtractError] = useState<string | null>(null)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [currentExtractionId, setCurrentExtractionId] = useState<string | null>(null)
+  const [prefillColumns, setPrefillColumns] = useState<any[] | undefined>(undefined)
+  const [prefillAIInstruction, setPrefillAIInstruction] = useState<string | undefined>(undefined)
+  const [historyRefreshTrigger, setHistoryRefreshTrigger] = useState(0)
 
   const uploadSectionRef = useRef<HTMLDivElement>(null)
   const selectSectionRef = useRef<HTMLDivElement>(null)
   const extractSectionRef = useRef<HTMLDivElement>(null)
+  const supabase = getSupabaseClient()
 
   const handleStepChange = (step: "upload" | "select" | "extract") => {
     setCurrentStep(step)
@@ -59,6 +64,8 @@ export default function Home() {
     setSelectedRows(new Set(Array.isArray(item.rows_selected) ? item.rows_selected : []))
     setSelectedCols(new Set(Array.isArray(item.cols_selected) ? item.cols_selected : []))
     setCurrentExtractionId(item.id || null)
+    setPrefillColumns(Array.isArray(item.columns) ? item.columns : undefined)
+    setPrefillAIInstruction(typeof item.ai_instruction === 'string' ? item.ai_instruction : undefined)
     setDataSelected(true)
     setCurrentStep("extract")
     setHistoryOpen(false)
@@ -69,30 +76,101 @@ export default function Home() {
 
   const handleImageUpload = (image: string) => {
     setUploadedImage(image)
+    setDataSelected(false)
     setCurrentStep("select")
-    // Save minimal history entry immediately on upload
+    // Save history entry immediately on upload - this creates the history record
     ;(async () => {
       try {
+        console.log("[Page] Starting history save process...")
         const supabase = getSupabaseClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return
+        
+        console.log("[Page] Getting user...")
+        const { data: { user }, error: userError } = await supabase.auth.getUser()
+        
+        if (userError) {
+          console.error("[Page] Failed to get user:", userError)
+          toast.error(`Authentication error: ${userError.message}. History will not be saved.`)
+          return
+        }
+        
+        if (!user) {
+          console.warn("[Page] No user found, skipping history save")
+          toast.warning("Not signed in. History will not be saved. Please sign in to save your extractions.")
+          return
+        }
+        
+        console.log("[Page] User found:", user.id)
+        
+        // Don't truncate image URLs - store full URL for preview
+        // If it's too long, we'll handle it differently (maybe store in Supabase Storage later)
+        let imageUrl = image || null
+        // Note: PostgreSQL text fields can handle up to ~1GB, so we should be fine
+        // But if there are issues, we can implement Supabase Storage later
+        
         const payload = {
           user_id: user.id,
-          image_url: image || null,
+          image_url: imageUrl,
           rows_selected: [],
           cols_selected: [],
-          data: null,
+          data: {}, // Use empty object instead of null to satisfy NOT NULL constraint
+          columns: [],
+          ai_instruction: "",
         }
+        
+        console.log("[Page] Saving history entry on image upload...", { 
+          user_id: user.id, 
+          has_image: !!image,
+          image_length: image?.length || 0,
+          payload_image_length: imageUrl?.length || 0
+        })
+        
         const { data: inserted, error } = await supabase
           .from("extractions")
           .insert(payload)
-          .select("id")
+          .select("id,created_at,image_url")
           .single()
-        if (!error && inserted?.id) {
-          setCurrentExtractionId(String(inserted.id))
+        
+        if (error) {
+          console.error("[Page] Failed to save history entry:", error)
+          console.error("[Page] Error code:", error.code)
+          console.error("[Page] Error message:", error.message)
+          console.error("[Page] Error details:", JSON.stringify(error, null, 2))
+          
+          // Show user-friendly error message
+          let errorMsg = "Failed to save history entry"
+          if (error.code === '23505') {
+            errorMsg = "History entry already exists"
+          } else if (error.code === '42501') {
+            errorMsg = "Permission denied. Check RLS policies."
+          } else if (error.message) {
+            errorMsg = `Failed to save: ${error.message}`
+          }
+          
+          toast.error(errorMsg)
+          return
         }
-      } catch (_) {
-        // non-blocking: ignore failures here; user can still proceed
+        
+        if (inserted?.id) {
+          console.log("[Page] ✅ History entry saved successfully:", { 
+            id: inserted.id, 
+            created_at: inserted.created_at,
+            has_image: !!inserted.image_url 
+          })
+          setCurrentExtractionId(String(inserted.id))
+          
+          // Trigger history sidebar refresh
+          setHistoryRefreshTrigger(prev => prev + 1)
+          
+          // Show a toast to confirm history was saved
+          toast.success("Image uploaded and saved to history")
+        } else {
+          console.warn("[Page] History entry insert returned no ID")
+          toast.warning("History entry created but no ID returned")
+        }
+      } catch (err: any) {
+        console.error("[Page] Exception saving history on upload:", err)
+        console.error("[Page] Exception stack:", err?.stack)
+        toast.error(`Error saving history: ${err?.message || 'Unknown error'}`)
       }
     })()
     setTimeout(() => {
@@ -103,6 +181,14 @@ export default function Home() {
   const handleDataSelected = (selected: boolean) => {
     setDataSelected(selected)
     if (selected) {
+      // If extraction is already in progress, just navigate to extract page to show loading
+      if (isExtracting) {
+        setCurrentStep("extract")
+        setTimeout(() => {
+          extractSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+        }, 300)
+        return
+      }
       setCurrentStep("extract")
       setTimeout(() => {
         extractSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
@@ -110,8 +196,31 @@ export default function Home() {
     }
   }
 
+  // Persist row/col selections to history
+  useEffect(() => {
+    if (!currentExtractionId) return
+    const rows = Array.from(selectedRows)
+    const cols = Array.from(selectedCols)
+    supabase
+      .from("extractions")
+      .update({ rows_selected: rows, cols_selected: cols })
+      .eq("id", currentExtractionId)
+      .then(() => {})
+  }, [selectedRows, selectedCols, currentExtractionId])
+
+  // Persist extracted data to history when available
+  useEffect(() => {
+    if (!currentExtractionId) return
+    if (extractData === null || extractData === undefined) return
+    supabase
+      .from("extractions")
+      .update({ data: extractData })
+      .eq("id", currentExtractionId)
+      .then(() => {})
+  }, [extractData, currentExtractionId])
+
   return (
-    <main className="h-screen bg-gradient-to-br from-[#1a1a2e] via-[#0f1419] to-[#1a1a2e] relative overflow-auto flex flex-col">
+    <main className="h-screen bg-gradient-to-br from-[#1a1a2e] via-[#0f1419] to-[#1a1a2e] relative overflow-hidden flex flex-col">
       <div className="absolute inset-0 bg-gradient-to-tr from-yellow-500/5 via-transparent to-transparent pointer-events-none" />
 
       {/* Header removed for desktop app UX */}
@@ -127,7 +236,19 @@ export default function Home() {
       </button>
 
       {/* Floating history sidebar */}
-      <HistorySidebar open={historyOpen} onClose={() => setHistoryOpen(false)} onSelect={handleHistorySelect} />
+      <HistorySidebar 
+        open={historyOpen} 
+        onClose={() => setHistoryOpen(false)} 
+        onSelect={handleHistorySelect}
+        refreshTrigger={historyRefreshTrigger}
+      />
+      {historyOpen && (
+        <div
+          onClick={() => setHistoryOpen(false)}
+          className="fixed inset-0 z-40 bg-black/0"
+          aria-hidden="true"
+        />
+      )}
 
       <div className="relative z-10 flex-1 overflow-hidden">
         {/* Upload Section */}
@@ -149,18 +270,26 @@ export default function Home() {
                 onColSelect={setSelectedCols}
                 onDataSelected={handleDataSelected}
                 onUploadNew={handleNewUpload}
+                extractionId={currentExtractionId}
+                prefillColumns={prefillColumns as any}
+                prefillAIInstruction={prefillAIInstruction}
+                isExtracting={isExtracting}
                 onStartExtract={() => {
                   setIsExtracting(true)
                   setExtractError(null)
                   setExtractData(null)
                 }}
                 onExtractResult={(data: any) => {
+                  console.log("[Page] Extraction result received:", data)
                   setIsExtracting(false)
+                  setExtractError(null)
                   setExtractData(data)
                 }}
                 onExtractError={(message: string) => {
                   setIsExtracting(false)
-                  setExtractError(message)
+                  if (!extractData) {
+                    setExtractError(message)
+                  }
                 }}
               />
             </div>

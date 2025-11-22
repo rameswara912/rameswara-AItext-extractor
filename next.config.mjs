@@ -1,13 +1,34 @@
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
+  output: 'standalone',
+  
+  // Use relative path to avoid hardcoded absolute paths
+  outputFileTracingRoot: path.join(__dirname, '..'),
+  
   typescript: {
     ignoreBuildErrors: true,
   },
   images: {
     unoptimized: true,
+  },
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          {
+            key: "Content-Security-Policy",
+            value: "default-src 'self' https://aozsuqxcpbotbxmwstin.supabase.co; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: blob: https:; font-src 'self' data: https:; connect-src 'self' https://aozsuqxcpbotbxmwstin.supabase.co wss://aozsuqxcpbotbxmwstin.supabase.co http://localhost:* https: wss:; object-src 'self' data: blob: https: http:; frame-src 'self' data: blob: https: http:; worker-src 'self' blob:; frame-ancestors 'self';",
+          },
+        ],
+      },
+    ]
   },
   async rewrites() {
     // By default, do NOT rewrite /api/extract so our API route runs.

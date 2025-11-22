@@ -1,12 +1,12 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useState, useEffect } from "react"
 import Image from "next/image"
 import { Copy, Download, FileText } from "lucide-react"
 import { getSupabaseClient } from "@/lib/supabase"
 
 interface ExtractedDataPanelProps {
-  imageUrl: string
+  imageUrl?: string | null
   selectedRows: Set<number>
   selectedCols: Set<number>
   extractionId?: string | null
@@ -29,6 +29,7 @@ export default function ExtractedDataPanel({
   const [copied, setCopied] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [headersOverride, setHeadersOverride] = useState<string[] | null>(null)
 
   // Convert filtered table data to Excel XML (SpreadsheetML 2003) and trigger download
   const escapeXml = (s: string) =>
@@ -107,6 +108,14 @@ export default function ExtractedDataPanel({
       `<Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#333333"/>` +
       `</Borders>` +
       `</Style>` +
+      // Warning text style: yellow text, bold
+      `<Style ss:ID="CellWarnText">` +
+      `<Font ss:Color="#FFC107" ss:Bold="1"/>` +
+      `<Alignment ss:Horizontal="Left" ss:Vertical="Center"/>` +
+      `<Borders>` +
+      `<Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#333333"/>` +
+      `</Borders>` +
+      `</Style>` +
       // Number cell style: right aligned
       `<Style ss:ID="CellNumber">` +
       `<Alignment ss:Horizontal="Right" ss:Vertical="Center"/>` +
@@ -118,9 +127,13 @@ export default function ExtractedDataPanel({
 
     const isNumeric = (val: any) => {
       if (val === null || val === undefined) return false
-      // treat phone numbers and numeric-looking strings as numbers for alignment
-      const n = Number(String(val).replace(/[^0-9.\-]/g, ""))
-      return !isNaN(n) && String(val).trim() !== ""
+      const s = String(val).trim()
+      const cleaned = s.replace(/[^0-9.\-]/g, "")
+      if (!cleaned) return false
+      const digits = cleaned.replace(/[^0-9]/g, "")
+      if (digits.length >= 10) return false
+      if (/^0\d+$/.test(cleaned)) return false
+      return /^[-+]?\d+(?:\.\d+)?$/.test(cleaned)
     }
 
     const normalizedHeaders = normalizeRow(headers as string[])
@@ -204,10 +217,10 @@ export default function ExtractedDataPanel({
       }
 
       // Assign phones to columns in order
-      const apnany = phones[0] ?? "0"
-      const narone = phones[1] ?? "0"
-      const primafone = phones[2] ?? "0"
-      const second = phones[3] ?? "0"
+      const apnany = phones[0] ?? ""
+      const narone = phones[1] ?? ""
+      const primafone = phones[2] ?? ""
+      const second = phones[3] ?? ""
 
       // Remarks: anything beyond core text (none for now)
       const remarks = ""
@@ -226,8 +239,13 @@ export default function ExtractedDataPanel({
               return `<Cell ss:StyleID="Header"><Data ss:Type="String">${escapeXml(val)}</Data></Cell>`
             }
             if (isNumeric(val)) {
-              const num = Number(String(val).replace(/[^0-9.\-]/g, ""))
-              return `<Cell ss:StyleID="CellNumber"><Data ss:Type="Number">${num}</Data></Cell>`
+              const cleaned = String(val).replace(/[^0-9.\-]/g, "")
+              const num = parseFloat(cleaned)
+              return `<Cell ss:StyleID=\"CellNumber\"><Data ss:Type=\"Number\">${Number.isFinite(num) ? num : 0}</Data></Cell>`
+            }
+            const flagged = /(not\s*clear|unclear|notclear)/i.test(val)
+            if (flagged) {
+              return `<Cell ss:StyleID="CellWarnText"><Data ss:Type="String">${escapeXml(val)}</Data></Cell>`
             }
             return `<Cell ss:StyleID="CellText"><Data ss:Type="String">${escapeXml(val)}</Data></Cell>`
           })
@@ -279,10 +297,23 @@ export default function ExtractedDataPanel({
         throw new Error("You must be signed in to save to Supabase")
       }
 
-      const updatePayload = {
+      const updatePayload: any = {
         rows_selected: Array.from(selectedRows ?? []),
         cols_selected: Array.from(selectedCols ?? []),
         data: data ?? null,
+      }
+
+      // Include template info if available on the current extraction
+      if (extractionId) {
+        const { data: existing } = await supabase
+          .from("extractions")
+          .select("columns,ai_instruction")
+          .eq("id", extractionId)
+          .single()
+        if (existing) {
+          updatePayload.columns = existing.columns ?? []
+          updatePayload.ai_instruction = existing.ai_instruction ?? ""
+        }
       }
 
       if (extractionId) {
@@ -311,13 +342,37 @@ export default function ExtractedDataPanel({
   const handleExportAndSave = async (data2d: string[][]) => {
     // Kick off the download immediately for good UX
     exportToExcel(data2d)
-    // Save the original JSON to Supabase in the background
-    await saveExtractionToSupabase()
+    // Note: History is already saved when image is uploaded, so we just update the existing record
+    // This ensures the data is persisted to the history entry created on upload
+    if (extractionId) {
+      try {
+        const supabase = getSupabaseClient()
+        const { error } = await supabase
+          .from("extractions")
+          .update({ 
+            data: data ?? null,
+            rows_selected: Array.from(selectedRows ?? []),
+            cols_selected: Array.from(selectedCols ?? []),
+          })
+          .eq("id", extractionId)
+        if (error) {
+          console.error("[ExtractedDataPanel] Failed to update history:", error)
+        } else {
+          console.log("[ExtractedDataPanel] History updated successfully")
+        }
+      } catch (err) {
+        console.error("[ExtractedDataPanel] Error updating history:", err)
+      }
+    }
   }
 
   // Normalize JSON into a tabular shape when possible
   const tableData: string[][] | null = useMemo(() => {
-    if (!data) return null
+    if (!data) {
+      console.log("[ExtractedDataPanel] No data provided")
+      return null
+    }
+    console.log("[ExtractedDataPanel] Received data:", data)
 
     const safeParse = (v: any): any => {
       if (typeof v === "string") {
@@ -388,13 +443,13 @@ export default function ExtractedDataPanel({
       }
       // Array of objects -> merge keys into headers
       if (typeof first === "object" && first !== null) {
-        const headers = Array.from(
+        const headers: string[] = Array.from(
           arr.reduce((set: Set<string>, row: Record<string, any>) => {
             Object.keys(row || {}).forEach((k) => set.add(k))
             return set
           }, new Set<string>())
         )
-        const rows = (arr as Record<string, any>[]).map((row) => headers.map((h) => toStr(row?.[h])))
+        const rows = (arr as Record<string, any>[]).map((row) => headers.map((h: string) => toStr((row as Record<string, any>)[h])))
         return [headers, ...rows]
       }
       // Array of primitives -> single column
@@ -403,6 +458,7 @@ export default function ExtractedDataPanel({
 
     // Top-level array
     if (Array.isArray(data)) {
+      console.log("[ExtractedDataPanel] Data is an array, length:", data.length)
       // Parse any stringified items
       const arr = (data as any[]).map((item) => safeParse(item))
       // Special-case: array wrapping a single object that contains records/data
@@ -417,34 +473,42 @@ export default function ExtractedDataPanel({
         if (arrayKey) {
           const colObj = parsedWrapped["columns"]
           if (colObj && typeof colObj === "object") {
-            const orderedKeys = Object.keys(colObj)
+            const names = Object.keys(colObj)
               .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
               .map((k) => String(colObj[k]))
               .filter(Boolean)
 
             const records = parsedWrapped[arrayKey] as Record<string, any>[]
             if (Array.isArray(records) && records.length > 0) {
-              const extraKeys = Array.from(
-                records.reduce((set: Set<string>, row) => {
-                  Object.keys(row || {}).forEach((k) => {
-                    if (!orderedKeys.includes(k)) set.add(k)
-                  })
-                  return set
-                }, new Set<string>())
-              )
-              const headers = orderedKeys.length > 0 ? [...orderedKeys, ...extraKeys] : [...extraKeys]
-              const rows = records.map((row) => headers.map((h) => toStr(row?.[h])))
+              const getRowValues = (row: Record<string, any>, namesArr: string[], count: number): string[] => {
+                const vals: string[] = []
+                for (let i = 0; i < count; i++) {
+                  const nameKey = namesArr[i]
+                  const colKey = `column_${i + 1}`
+                  const idxAlt = row[i] ?? row[String(i)]
+                  const value = row?.[nameKey] ?? row?.[colKey] ?? idxAlt
+                  vals.push(toStr(value))
+                }
+                return vals
+              }
+
+              const count = names.length || Object.keys(records[0] || {}).length
+              const rows = records.map((row) => getRowValues(row, names, count))
+              const headers = names.length > 0 ? names : Object.keys(records[0] || {})
               return [headers, ...rows]
             }
           }
           return arrayToTable(parsedWrapped[arrayKey])
         }
       }
-      return arrayToTable(arr)
+      const result = arrayToTable(arr)
+      console.log("[ExtractedDataPanel] Array converted to table, rows:", result.length)
+      return result
     }
 
     // Top-level object: try to find an array property (e.g. records, data, items)
     if (typeof data === "object" && data !== null) {
+      console.log("[ExtractedDataPanel] Data is an object, keys:", Object.keys(data))
       // Attempt to parse stringified JSON fields inside the object
       const parsedObj: Record<string, any> = {}
       Object.entries(data as Record<string, any>).forEach(([k, v]) => {
@@ -456,48 +520,128 @@ export default function ExtractedDataPanel({
       let arrayKey = preferredKeys.find((k) => Array.isArray(parsedObj[k]))
       if (!arrayKey) arrayKey = keys.find((k) => Array.isArray(parsedObj[k]))
       if (arrayKey) {
+        console.log("[ExtractedDataPanel] Found array key:", arrayKey, "length:", parsedObj[arrayKey]?.length)
         // If there is a `columns` object, use it to define header order
         const colObj = parsedObj["columns"]
         if (colObj && typeof colObj === "object") {
-          const orderedKeys = Object.keys(colObj)
+          const names = Object.keys(colObj)
             .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
             .map((k) => String(colObj[k]))
             .filter(Boolean)
 
           const records = parsedObj[arrayKey] as Record<string, any>[]
           if (Array.isArray(records) && records.length > 0) {
-            // Include any extra keys from records not in columns at the end
-            const extraKeys = Array.from(
-              records.reduce((set: Set<string>, row) => {
-                Object.keys(row || {}).forEach((k) => {
-                  if (!orderedKeys.includes(k)) set.add(k)
-                })
-                return set
-              }, new Set<string>())
-            )
+            const getRowValues = (row: Record<string, any>, namesArr: string[], count: number): string[] => {
+              const vals: string[] = []
+              for (let i = 0; i < count; i++) {
+                const nameKey = namesArr[i]
+                const colKey = `column_${i + 1}`
+                const idxAlt = row[i] ?? row[String(i)]
+                const value = row?.[nameKey] ?? row?.[colKey] ?? idxAlt
+                vals.push(toStr(value))
+              }
+              return vals
+            }
 
-            const headers = orderedKeys.length > 0 ? [...orderedKeys, ...extraKeys] : [...extraKeys]
-            const rows = records.map((row) => headers.map((h) => toStr(row?.[h])))
+            const count = names.length || Object.keys(records[0] || {}).length
+            const rows = records.map((row) => getRowValues(row, names, count))
+            const headers = names.length > 0 ? names : Object.keys(records[0] || {})
             return [headers, ...rows]
           }
         }
 
-        return arrayToTable(parsedObj[arrayKey])
+        const result = arrayToTable(parsedObj[arrayKey])
+        console.log("[ExtractedDataPanel] Object array converted to table, rows:", result.length)
+        return result
       }
       // Object with primitives -> key/value table
       const entries = Object.entries(parsedObj)
-      return [["Key", "Value"], ...entries.map(([k, v]) => [k, typeof v === "object" ? JSON.stringify(v) : toStr(v)])]
+      const keyValueTable = [["Key", "Value"], ...entries.map(([k, v]) => [k, typeof v === "object" ? JSON.stringify(v) : toStr(v)])]
+      console.log("[ExtractedDataPanel] Object converted to key/value table, rows:", keyValueTable.length)
+      return keyValueTable
     }
 
     // Fallback: show single row with JSON string
-    return [["Result"], [JSON.stringify(data, null, 2)]]
+    const fallback = [["Result"], [JSON.stringify(data, null, 2)]]
+    console.log("[ExtractedDataPanel] Using fallback format, tableData:", fallback)
+    return fallback
   }, [data])
+
+  useEffect(() => {
+    if (!extractionId) {
+      setHeadersOverride(null)
+      return
+    }
+    ;(async () => {
+      try {
+        const supabase = getSupabaseClient()
+        const { data: row } = await supabase
+          .from("extractions")
+          .select("columns")
+          .eq("id", extractionId)
+          .single()
+        const cols = (row?.columns || []) as Array<{ name?: string }>
+        const names = cols.map(c => String(c?.name ?? "")).filter(Boolean)
+        setHeadersOverride(names.length > 0 ? names : null)
+      } catch {
+        setHeadersOverride(null)
+      }
+    })()
+  }, [extractionId])
+
+  const finalTableData: string[][] | null = useMemo(() => {
+    if (!tableData) {
+      console.log("[ExtractedDataPanel] finalTableData: tableData is null")
+      return null
+    }
+    console.log("[ExtractedDataPanel] finalTableData: tableData has", tableData.length, "rows")
+    const baseHeaders = Array.isArray(tableData[0]) ? tableData[0] : []
+    if (!headersOverride || headersOverride.length === 0) {
+      console.log("[ExtractedDataPanel] finalTableData: No headers override, returning tableData as-is")
+      return tableData
+    }
+    let adjusted = headersOverride.slice()
+    const targetLen = baseHeaders.length
+    if (adjusted.length < targetLen) {
+      const lastIsRemarks = String(baseHeaders[targetLen - 1] || "").toLowerCase().includes("remarks")
+      while (adjusted.length < targetLen) {
+        adjusted.push(lastIsRemarks && adjusted.length === targetLen - 1 ? "remarks" : `column_${adjusted.length + 1}`)
+      }
+    } else if (adjusted.length > targetLen) {
+      adjusted = adjusted.slice(0, targetLen)
+    }
+    const result = [adjusted, ...tableData.slice(1)]
+    console.log("[ExtractedDataPanel] finalTableData: Applied headers override, result has", result.length, "rows")
+    return result
+  }, [tableData, headersOverride])
 
   const copyToClipboard = () => {
     const text = data ? JSON.stringify(data, null, 2) : ""
     navigator.clipboard.writeText(text)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  const renderHighlighted = (value: string) => {
+    const phrases = ["not clear", "notclear", "unclear"]
+    const escaped = phrases.map((p) => p.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&"))
+    const re = new RegExp(`(${escaped.join("|")})`, "gi")
+    const parts = String(value).split(re)
+    if (parts.length === 1) return value
+    const isMatch = (s: string) => phrases.includes(s.toLowerCase())
+    return (
+      <span>
+        {parts.map((p, i) => (
+          isMatch(p) ? (
+            <span key={i} className="text-yellow-400 font-semibold">
+              {p}
+            </span>
+          ) : (
+            <span key={i}>{p}</span>
+          )
+        ))}
+      </span>
+    )
   }
 
   return (
@@ -510,12 +654,14 @@ export default function ExtractedDataPanel({
       {/* Main Content - Two Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Data Table - Takes 2 columns */}
-        <div className="lg:col-span-2 glass p-6 glow-border">
-          {/* Loading State */}
+        <div className="lg:col-span-2 glass p-6 glow-border min-h-[400px]">
+          {/* Loading State - Show this FIRST when loading */}
           {loading && (
             <div className="flex flex-col items-center justify-center py-16">
               <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-yellow-400 mb-4" />
-              <p className="text-white/70 text-sm">Extracting… please wait</p>
+              <p className="text-white/70 text-sm mb-2 font-semibold">Extracting data… please wait</p>
+              <p className="text-white/50 text-xs mb-1">This may take a few minutes depending on the image complexity</p>
+              <p className="text-white/40 text-xs">Waiting for response from extraction service...</p>
             </div>
           )}
 
@@ -528,12 +674,12 @@ export default function ExtractedDataPanel({
           )}
 
           {/* Data Table or JSON */}
-          {!loading && !error && tableData && (
+          {!loading && !error && finalTableData && (
             <div className="relative max-h-[60vh] overflow-auto">
               <table className="min-w-max w-full">
                 <thead className="sticky top-0 bg-black/40 backdrop-blur">
                   <tr className="border-b border-white/10">
-                    {tableData[0].map((cell, colIdx) => (
+                    {finalTableData[0].map((cell, colIdx) => (
                       <th
                         key={`header-${colIdx}`}
                         className={`px-4 py-3 text-sm font-semibold ${
@@ -546,7 +692,7 @@ export default function ExtractedDataPanel({
                   </tr>
                 </thead>
                 <tbody>
-                  {tableData.slice(1).map((row, rowIdx) => (
+                  {finalTableData.slice(1).map((row, rowIdx) => (
                     <tr
                       key={rowIdx}
                       className={`border-b border-white/10 transition ${
@@ -560,7 +706,7 @@ export default function ExtractedDataPanel({
                             selectedCols.size === 0 || selectedCols.has(colIdx) ? "text-white" : "text-white/30"
                           }`}
                         >
-                          {cell}
+                          {renderHighlighted(cell)}
                         </td>
                       ))}
                     </tr>
@@ -569,6 +715,30 @@ export default function ExtractedDataPanel({
               </table>
             </div>
           )}
+
+          {/* Empty State - Data exists but couldn't be parsed into table */}
+          {!loading && !error && !finalTableData && data && (
+            <div className="flex flex-col items-center justify-center py-16">
+              <div className="bg-yellow-500/10 border border-yellow-500/30 text-yellow-300 p-6 rounded-lg max-w-2xl w-full">
+                <p className="font-semibold mb-2">Data received but couldn't be displayed as a table</p>
+                <p className="text-sm mb-4 text-yellow-200/80">Showing raw JSON data:</p>
+                <pre className="bg-black/30 p-4 rounded text-xs overflow-auto max-h-96 text-white/90 font-mono">
+                  {JSON.stringify(data, null, 2)}
+                </pre>
+              </div>
+            </div>
+          )}
+
+          {/* Empty State - No data after extraction */}
+          {!loading && !error && !finalTableData && !data && (
+            <div className="flex flex-col items-center justify-center py-16">
+              <div className="bg-white/5 border border-white/10 text-white/60 p-6 rounded-lg">
+                <p className="font-semibold mb-2">No data extracted</p>
+                <p className="text-sm">The extraction completed but no data was returned. Please try again.</p>
+              </div>
+            </div>
+          )}
+
         </div>
 
         {/* Source Image and Stats */}
@@ -614,11 +784,11 @@ export default function ExtractedDataPanel({
 
             <div className="grid grid-cols-2 gap-4">
               <div className="border-t border-white/10 pt-4 text-center">
-                <p className="text-yellow-400 font-bold text-2xl">{selectedRows.size || (tableData?.length ? tableData.length - 1 : 0)}</p>
+                <p className="text-yellow-400 font-bold text-2xl">{selectedRows.size || (finalTableData?.length ? finalTableData.length - 1 : 0)}</p>
                 <p className="text-white/60 text-xs uppercase tracking-wider">Rows Selected</p>
               </div>
               <div className="border-t border-white/10 pt-4 text-center">
-                <p className="text-yellow-400 font-bold text-2xl">{selectedCols.size || (tableData && tableData[0] ? tableData[0].length : 0)}</p>
+                <p className="text-yellow-400 font-bold text-2xl">{selectedCols.size || (finalTableData && finalTableData[0] ? finalTableData[0].length : 0)}</p>
                 <p className="text-white/60 text-xs uppercase tracking-wider">Columns Selected</p>
               </div>
             </div>
@@ -632,7 +802,7 @@ export default function ExtractedDataPanel({
                 {copied ? "Copied" : "Copy"}
               </button>
               <button
-                onClick={() => tableData && handleExportAndSave(tableData)}
+                onClick={() => finalTableData && handleExportAndSave(finalTableData)}
                 className="flex-1 px-4 py-2 bg-white/10 border border-white/20 hover:bg-white/15 text-white rounded font-medium text-sm transition flex items-center gap-2 justify-center"
                 disabled={saving}
                 title={saveError || (saving ? "Saving…" : "Export and Save to Supabase")}

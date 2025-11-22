@@ -18,6 +18,7 @@ export default function ImagePreview({ imageUrl }: ImagePreviewProps) {
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
   const containerRef = useRef<HTMLDivElement>(null)
   const imageRef = useRef<HTMLDivElement>(null)
+  const [pdfSrc, setPdfSrc] = useState<string | null>(null)
 
   const MIN_ZOOM = 1
   const MAX_ZOOM = 3
@@ -114,6 +115,33 @@ export default function ImagePreview({ imageUrl }: ImagePreviewProps) {
     }
   }, [zoom, position, isDragging, dragStart])
 
+  // Derive a browser-friendly PDF src (blob URL) for data URIs
+  useEffect(() => {
+    let revokeUrl: string | null = null
+    const isPdf = !!imageUrl && (imageUrl.startsWith("data:application/pdf") || imageUrl.toLowerCase().endsWith(".pdf"))
+    if (!isPdf) {
+      setPdfSrc(null)
+      return
+    }
+    if (imageUrl.startsWith("data:application/pdf")) {
+      try {
+        const base64 = imageUrl.split(",")[1] || ""
+        const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0))
+        const blob = new Blob([bytes], { type: "application/pdf" })
+        const url = URL.createObjectURL(blob)
+        revokeUrl = url
+        setPdfSrc(url)
+      } catch {
+        setPdfSrc(imageUrl)
+      }
+    } else {
+      setPdfSrc(imageUrl)
+    }
+    return () => {
+      if (revokeUrl) URL.revokeObjectURL(revokeUrl)
+    }
+  }, [imageUrl])
+
   return (
     <div className="h-full flex flex-col">
       {/* Preview Container with Glassmorphism */}
@@ -131,22 +159,9 @@ export default function ImagePreview({ imageUrl }: ImagePreviewProps) {
         onTouchStart={handleTouchStart}
       >
         {/* Image/PDF Container */}
-        {imageUrl && imageUrl.startsWith("data:application/pdf") ? (
+        {pdfSrc ? (
           <div className="w-full h-full">
-            <object data={imageUrl} type="application/pdf" className="w-full h-full">
-              <div className="w-full h-full flex items-center justify-center">
-                <div className="glass p-6 rounded-xl border border-white/10 text-center">
-                  <div className="flex justify-center mb-3">
-                    <div className="p-3 bg-yellow-500/20 rounded-full">
-                      <FileText className="w-8 h-8 text-yellow-400" />
-                    </div>
-                  </div>
-                  <div className="text-white font-semibold">PDF Preview Unsupported</div>
-                  <div className="text-white/70 text-sm mt-1">Your browser cannot display this PDF inline.</div>
-                  <a href={imageUrl} target="_blank" rel="noreferrer" className="mt-3 inline-block px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-black rounded-lg font-semibold">Open PDF in new tab</a>
-                </div>
-              </div>
-            </object>
+            <iframe src={pdfSrc} className="w-full h-full" title="PDF Preview" />
           </div>
         ) : (
           <motion.div

@@ -4,8 +4,10 @@ import type React from "react"
 
 import { Upload } from "lucide-react"
 import { useMemo, useState, useEffect } from "react"
+import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import { getSupabaseClient } from "../lib/supabase"
+import Link from "next/link"
 
 interface HeroProps {
   onImageUpload: (imageUrl: string) => void
@@ -55,7 +57,7 @@ export default function Hero({ onImageUpload }: HeroProps) {
     e.preventDefault()
     setIsDragging(false)
     if (!isAuthed) {
-      alert("Please sign in to upload files.")
+      toast.error("Please sign in to upload files.")
       router.push("/login")
       return
     }
@@ -66,19 +68,18 @@ export default function Hero({ onImageUpload }: HeroProps) {
       const allowedTypes = [
         "image/png",
         "image/jpeg",
-        "image/jpg",
-        "image/gif",
-        "image/webp",
         "application/pdf",
       ]
 
       if (!allowedTypes.includes(file.type)) {
-        alert("Please upload an image or PDF file.")
+        const attemptedType = file.type || "unknown"
+        const ext = file.name.split(".").pop()?.toUpperCase() || "UNKNOWN"
+        toast.error(`Only JPG, PNG or PDF files are allowed. Selected: ${attemptedType} (${ext})`)
         return
       }
 
       if (file.size > MAX_SIZE) {
-        alert("File size exceeds 10MB limit.")
+        toast.error("File size exceeds 10MB limit.")
         return
       }
 
@@ -94,7 +95,7 @@ export default function Hero({ onImageUpload }: HeroProps) {
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!isAuthed) {
-      alert("Please sign in to upload files.")
+      toast.error("Please sign in to upload files.")
       router.push("/login")
       return
     }
@@ -105,19 +106,18 @@ export default function Hero({ onImageUpload }: HeroProps) {
       const allowedTypes = [
         "image/png",
         "image/jpeg",
-        "image/jpg",
-        "image/gif",
-        "image/webp",
         "application/pdf",
       ]
 
       if (!allowedTypes.includes(file.type)) {
-        alert("Please upload an image or PDF file.")
+        const attemptedType = file.type || "unknown"
+        const ext = file.name.split(".").pop()?.toUpperCase() || "UNKNOWN"
+        toast.error(`Only JPG, PNG or PDF files are allowed. Selected: ${attemptedType} (${ext})`)
         return
       }
 
       if (file.size > MAX_SIZE) {
-        alert("File size exceeds 10MB limit.")
+        toast.error("File size exceeds 10MB limit.")
         return
       }
 
@@ -155,18 +155,18 @@ export default function Hero({ onImageUpload }: HeroProps) {
 
           {isAuthed ? (
             <label className="inline-block">
-              <input type="file" accept="image/*,application/pdf" onChange={handleFileSelect} className="hidden" />
+              <input type="file" accept="image/jpeg,image/png,application/pdf" onChange={handleFileSelect} className="hidden" />
               <span className="px-8 py-3 bg-yellow-500 hover:bg-yellow-600 text-black font-semibold rounded-lg cursor-pointer transition glow-border inline-block">
                 Choose Image
               </span>
             </label>
           ) : (
-            <button
-              onClick={() => router.push("/login")}
+            <Link
+              href="/login"
               className="px-8 py-3 bg-yellow-500 hover:bg-yellow-600 text-black font-semibold rounded-lg transition glow-border inline-block"
             >
               Sign in to Upload
-            </button>
+            </Link>
           )}
 
           <p className="text-white/40 text-sm mt-6">

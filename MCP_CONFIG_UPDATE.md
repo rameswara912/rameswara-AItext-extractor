@@ -19,7 +19,7 @@ Update the "supabase" server configuration in `mcp.json`:
         "--project-ref=aozsuqxcpbotbxmwstin"
       ],
       "env": {
-        "SUPABASE_ACCESS_TOKEN": "sbp_8760bfb115b3fc140e7027ee39a7bcd189dace59"
+        "SUPABASE_ACCESS_TOKEN": "<YOUR_SUPABASE_ACCESS_TOKEN>"
       }
     },
     "selfhosted-supabase": {
@@ -42,12 +42,12 @@ Update the "supabase" server configuration in `mcp.json`:
 }
 ```
 
-**Note**: You can keep both configurations if needed, or use just one.
+**Note**: Use a Supabase account access token from Dashboard → Account → Access Tokens. Do not use Stripe tokens or client publishable keys here.
 
 ## Project Reference
 - **Project Ref**: `aozsuqxcpbotbxmwstin`
 - **Project URL**: `https://aozsuqxcpbotbxmwstin.supabase.co`
-- **Access Token**: `sbp_8760bfb115b3fc140e7027ee39a7bcd189dace59`
+- **Access Token**: `<YOUR_SUPABASE_ACCESS_TOKEN>`
 
 After updating, restart Cursor for changes to take effect.
 
