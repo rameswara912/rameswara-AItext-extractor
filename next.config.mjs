@@ -11,11 +11,6 @@ const nextConfig = {
   // Use relative path to avoid hardcoded absolute paths
   outputFileTracingRoot: path.join(__dirname, '..'),
   
-  // Disable Turbopack to use webpack (which handles native modules better)
-  experimental: {
-    turbo: false,
-  },
-  
   typescript: {
     ignoreBuildErrors: true,
   },
