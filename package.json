@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "env NEXT_PRIVATE_SKIP_TURBO=1 next build",
+    "dev": "node -e \"process.env.NEXT_PRIVATE_SKIP_TURBO='1'; require('child_process').execSync('next dev', {stdio: 'inherit'})\"",
+    "build": "node -e \"process.env.NEXT_PRIVATE_SKIP_TURBO='1'; require('child_process').execSync('next build', {stdio: 'inherit'})\"",
     "start": "next start -p 3000",
     "lint": "eslint .",
     "postinstall": "node -e \"try { require('lightningcss-linux-x64-gnu'); require('@tailwindcss/oxide-linux-x64-gnu'); console.log('✓ All native modules verified'); } catch(e) { console.warn('⚠ Native module not found:', e.message); }\""

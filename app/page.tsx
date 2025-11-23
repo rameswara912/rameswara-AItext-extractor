@@ -232,6 +232,15 @@ export default function Home() {
       {/* Header removed for desktop app UX */}
       <AuthButton />
 
+      {/* Logo/Image at top center */}
+      <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50">
+        <img 
+          src="/image-removebg-preview.png" 
+          alt="Logo" 
+          className="h-12 w-auto object-contain rounded-lg border-2 border-white/20 shadow-lg"
+        />
+      </div>
+
       {/* History toggle button on the left */}
       <button
         onClick={() => setHistoryOpen((v) => !v)}
