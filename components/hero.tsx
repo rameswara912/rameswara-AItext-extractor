@@ -64,6 +64,39 @@ export default function Hero({ onImageUpload }: HeroProps) {
     setIsDragging(false)
   }
 
+  const validateFile = (file: File): boolean => {
+    const MAX_SIZE = 10 * 1024 * 1024 // 10MB
+    const allowedTypes = [
+      "image/png",
+      "image/jpeg",
+      "image/jpg",
+      "application/pdf",
+    ]
+    const allowedExtensions = ["pdf", "png", "jpg", "jpeg"]
+    
+    // Check file size
+    if (file.size > MAX_SIZE) {
+      toast.error("File size exceeds 10MB limit. Please upload a smaller file.")
+      return false
+    }
+
+    // Check MIME type
+    const isValidType = allowedTypes.includes(file.type.toLowerCase())
+    
+    // Also check file extension as fallback
+    const fileExtension = file.name.split(".").pop()?.toLowerCase() || ""
+    const isValidExtension = allowedExtensions.includes(fileExtension)
+
+    if (!isValidType && !isValidExtension) {
+      const attemptedType = file.type || "unknown"
+      const ext = file.name.split(".").pop()?.toUpperCase() || "UNKNOWN"
+      toast.error(`Invalid file format. Only upload PDF, PNG, JPG, or JPEG formats. Selected file: ${ext} (${attemptedType})`)
+      return false
+    }
+
+    return true
+  }
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
     setIsDragging(false)
@@ -75,22 +108,8 @@ export default function Hero({ onImageUpload }: HeroProps) {
     const files = e.dataTransfer.files
     if (files.length > 0) {
       const file = files[0]
-      const MAX_SIZE = 10 * 1024 * 1024 // 10MB
-      const allowedTypes = [
-        "image/png",
-        "image/jpeg",
-        "application/pdf",
-      ]
-
-      if (!allowedTypes.includes(file.type)) {
-        const attemptedType = file.type || "unknown"
-        const ext = file.name.split(".").pop()?.toUpperCase() || "UNKNOWN"
-        toast.error(`Only JPG, PNG or PDF files are allowed. Selected: ${attemptedType} (${ext})`)
-        return
-      }
-
-      if (file.size > MAX_SIZE) {
-        toast.error("File size exceeds 10MB limit.")
+      
+      if (!validateFile(file)) {
         return
       }
 
@@ -113,22 +132,10 @@ export default function Hero({ onImageUpload }: HeroProps) {
     const files = e.currentTarget.files
     if (files && files.length > 0) {
       const file = files[0]
-      const MAX_SIZE = 10 * 1024 * 1024 // 10MB
-      const allowedTypes = [
-        "image/png",
-        "image/jpeg",
-        "application/pdf",
-      ]
-
-      if (!allowedTypes.includes(file.type)) {
-        const attemptedType = file.type || "unknown"
-        const ext = file.name.split(".").pop()?.toUpperCase() || "UNKNOWN"
-        toast.error(`Only JPG, PNG or PDF files are allowed. Selected: ${attemptedType} (${ext})`)
-        return
-      }
-
-      if (file.size > MAX_SIZE) {
-        toast.error("File size exceeds 10MB limit.")
+      
+      if (!validateFile(file)) {
+        // Reset the input so user can try again
+        e.target.value = ""
         return
       }
 
@@ -218,7 +225,7 @@ export default function Hero({ onImageUpload }: HeroProps) {
           <motion.div variants={itemVariants}>
             {isAuthed ? (
               <label className="inline-block">
-                <input type="file" accept="image/jpeg,image/png,application/pdf" onChange={handleFileSelect} className="hidden" />
+                <input type="file" accept=".pdf,.png,.jpg,.jpeg,image/jpeg,image/png,image/jpg,application/pdf" onChange={handleFileSelect} className="hidden" />
                 <span className="px-8 py-3 bg-yellow-500 hover:bg-yellow-600 text-black font-semibold rounded-lg cursor-pointer transition glow-border inline-block">
                   Choose Image
                 </span>

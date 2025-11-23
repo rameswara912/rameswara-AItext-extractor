@@ -30,6 +30,7 @@ export default function Home() {
   const [prefillAIInstruction, setPrefillAIInstruction] = useState<string | undefined>(undefined)
   const [historyRefreshTrigger, setHistoryRefreshTrigger] = useState(0)
   const [isAdminUser, setIsAdminUser] = useState<boolean>(false)
+  const [userEmail, setUserEmail] = useState<string | null>(null)
 
   const uploadSectionRef = useRef<HTMLDivElement>(null)
   const selectSectionRef = useRef<HTMLDivElement>(null)
@@ -44,8 +45,11 @@ export default function Home() {
       // Ignore auth errors - they're expected when no session exists
       if (error && (error.message?.includes('Auth session missing') || error.name === 'AuthSessionMissingError')) {
         setIsAdminUser(false)
+        setUserEmail(null)
         return
       }
+      const email = data?.user?.email ?? null
+      setUserEmail(email)
       if (data?.user) {
         isAdmin().then((admin) => {
           if (mounted) {
@@ -58,15 +62,33 @@ export default function Home() {
     }).catch(() => {
       if (mounted) {
         setIsAdminUser(false)
+        setUserEmail(null)
       }
     })
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      const email = session?.user?.email ?? null
+      setUserEmail(email)
       if (session?.user) {
         isAdmin().then((admin) => {
           setIsAdminUser(admin)
         })
       } else {
         setIsAdminUser(false)
+        // Reset to upload page when user signs out
+        setCurrentStep("upload")
+        setUploadedImage(null)
+        setDataSelected(false)
+        setSelectedRows(new Set())
+        setSelectedCols(new Set())
+        setExtractData(null)
+        setExtractError(null)
+        setCurrentExtractionId(null)
+        setPrefillColumns(undefined)
+        setPrefillAIInstruction(undefined)
+        // Scroll to upload section after state reset
+        setTimeout(() => {
+          uploadSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+        }, 100)
       }
     })
     return () => {
@@ -411,12 +433,14 @@ export default function Home() {
         )}
       </div>
 
-      <FloatingNavbar
-        currentStep={currentStep}
-        onStepChange={handleStepChange}
-        isImageUploaded={!!uploadedImage}
-        isDataSelected={dataSelected}
-      />
+      {userEmail && (
+        <FloatingNavbar
+          currentStep={currentStep}
+          onStepChange={handleStepChange}
+          isImageUploaded={!!uploadedImage}
+          isDataSelected={dataSelected}
+        />
+      )}
     </main>
   )
 }

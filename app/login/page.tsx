@@ -22,6 +22,7 @@ export default function LoginPage() {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [isAdminUser, setIsAdminUser] = useState<boolean>(false);
+  const [showContactAdmin, setShowContactAdmin] = useState(false);
 
   useEffect(() => {
     if (!supabase) return;
@@ -82,6 +83,7 @@ export default function LoginPage() {
   async function handleLogin(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    setShowContactAdmin(false);
     setLoading(true);
     if (!supabase) {
       setLoading(false);
@@ -139,24 +141,7 @@ export default function LoginPage() {
     setLoading(false);
   }
   async function handleResetPassword() {
-    if (!email) {
-      setError("Enter your email and click Forgot password.");
-      return;
-    }
-    setLoading(true);
-    if (!supabase) {
-      setLoading(false);
-      const msg = "Auth is not configured. Check Supabase env vars.";
-      setError(msg);
-      toast.error(msg);
-      return;
-    }
-    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: "http://localhost:3000/login" });
-    setLoading(false);
-    if (error) {
-      setError(error.message);
-      return;
-    }
+    setShowContactAdmin(true);
     setError(null);
   }
 
@@ -197,13 +182,16 @@ export default function LoginPage() {
           </div>
         </div>
       ) : (
-        <form className="mt-3 space-y-3">
+        <form onSubmit={handleLogin} className="mt-3 space-y-3">
           <label className="block text-white/80 text-sm">Email</label>
           <input
             type="email"
             required
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              setShowContactAdmin(false);
+            }}
             placeholder="you@example.com"
             className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded text-white text-sm focus:outline-none focus:border-yellow-400"
           />
@@ -212,18 +200,25 @@ export default function LoginPage() {
             type="password"
             required
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              setShowContactAdmin(false);
+            }}
             placeholder="••••••••"
             className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded text-white text-sm focus:outline-none focus:border-yellow-400"
           />
           {error && (
             <div className="text-red-400 text-sm">{error}</div>
           )}
+          {showContactAdmin && (
+            <div className="text-yellow-400 text-sm text-center py-2 px-3 bg-yellow-500/10 border border-yellow-400/20 rounded">
+              Please contact your administrator
+            </div>
+          )}
           <button
-            type="button"
-            onClick={handleLogin}
+            type="submit"
             disabled={loading || !email || !password}
-            className="w-full px-3 py-2 bg-yellow-500 hover:bg-yellow-600 text-black rounded font-bold text-sm transition cursor-pointer"
+            className="w-full px-3 py-2 bg-yellow-500 hover:bg-yellow-600 text-black rounded font-bold text-sm transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? (mode === "signin" ? "Signing in…" : "Creating account…") : mode === "signin" ? "Sign in" : "Create account"}
           </button>

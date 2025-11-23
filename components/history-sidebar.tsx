@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import Image from "next/image"
 import { getSupabaseClient } from "@/lib/supabase"
 import { Clock, Trash2, FileText } from "lucide-react"
+import Link from "next/link"
 
 export interface ExtractionRow {
   id: string
@@ -71,10 +72,11 @@ export default function HistorySidebar({ open, onClose, onSelect, refreshTrigger
         } = await supabase.auth.getUser()
         
         if (userErr) {
-          // Silently handle missing session errors - they're expected when not logged in
+          // Handle missing session errors - show sign in message when not logged in
           if (userErr.message?.includes('Auth session missing') || userErr.name === 'AuthSessionMissingError') {
             if (isMounted) {
-              setError(null)
+              setItems([])
+              setError("SIGN_IN_REQUIRED")
               setLoading(false)
             }
             return
@@ -91,7 +93,7 @@ export default function HistorySidebar({ open, onClose, onSelect, refreshTrigger
           console.warn("[HistorySidebar] No user found")
           if (isMounted) {
             setItems([])
-            setError("Sign in to view your history")
+            setError("SIGN_IN_REQUIRED")
             setLoading(false)
           }
           return
@@ -314,12 +316,27 @@ export default function HistorySidebar({ open, onClose, onSelect, refreshTrigger
         </div>
 
         {loading && <div className="text-white/60 text-sm">Loading…</div>}
-        {error && <div className="text-red-300 text-sm">{error}</div>}
+        {error && error !== "SIGN_IN_REQUIRED" && <div className="text-red-300 text-sm">{error}</div>}
 
-        <div className="flex-1 overflow-auto space-y-2">
-          {items.length === 0 && !loading && (
-            <div className="text-white/40 text-sm">No history yet</div>
-          )}
+        {error === "SIGN_IN_REQUIRED" && (
+          <div className="flex-1 flex flex-col items-center justify-center text-center p-6">
+            <div className="text-white/60 text-sm mb-4">
+              Sign in to see your history
+            </div>
+            <Link
+              href="/login"
+              className="px-6 py-2 bg-yellow-500 hover:bg-yellow-600 text-black font-semibold rounded-lg transition inline-block"
+            >
+              Sign in
+            </Link>
+          </div>
+        )}
+
+        {!error && (
+          <div className="flex-1 overflow-auto space-y-2">
+            {items.length === 0 && !loading && (
+              <div className="text-white/40 text-sm">No history yet</div>
+            )}
           {items.map((item) => (
             <div key={item.id} className="flex items-center gap-3 p-2 rounded border border-white/10 hover:bg-white/5 transition">
               <button
@@ -377,9 +394,12 @@ export default function HistorySidebar({ open, onClose, onSelect, refreshTrigger
               </button>
             </div>
           ))}
-        </div>
+          </div>
+        )}
 
-        <p className="text-white/40 text-xs mt-2">Items older than 10 days are removed automatically.</p>
+        {!error && (
+          <p className="text-white/40 text-xs mt-2">Items older than 10 days are removed automatically.</p>
+        )}
       </div>
     </div>
   )

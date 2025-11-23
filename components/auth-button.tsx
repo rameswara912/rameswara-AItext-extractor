@@ -85,12 +85,15 @@ export default function AuthButton() {
   const handleLogout = async () => {
     if (GUEST_MODE) {
       setUserEmail(null)
+      router.push("/")
       return
     }
     if (!supabase) return
     setLoading(true)
     await supabase.auth.signOut()
     setLoading(false)
+    // Navigate to upload page after sign out
+    router.push("/")
   }
 
   // Small overlay top-right to mimic desktop app menu area
