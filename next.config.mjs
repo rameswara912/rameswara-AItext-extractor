@@ -6,7 +6,8 @@ const __dirname = path.dirname(__filename);
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'standalone',
+  // Removed 'output: standalone' for Netlify compatibility
+  // Netlify's Next.js plugin handles the build output automatically
   
   // Use relative path to avoid hardcoded absolute paths
   outputFileTracingRoot: path.join(__dirname, '..'),

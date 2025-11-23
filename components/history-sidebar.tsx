@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import Image from "next/image"
 import { getSupabaseClient } from "@/lib/supabase"
-import { Clock, Trash2 } from "lucide-react"
+import { Clock, Trash2, FileText } from "lucide-react"
 
 export interface ExtractionRow {
   id: string
@@ -320,18 +320,25 @@ export default function HistorySidebar({ open, onClose, onSelect, refreshTrigger
                 title="Load this extraction"
               >
                 <div className="flex items-center gap-3">
-                  <div className="relative w-10 h-10 bg-white/5 rounded overflow-hidden">
+                  <div className="relative w-10 h-10 bg-white/5 rounded overflow-hidden flex items-center justify-center">
                     {item.image_url && !item.image_url.includes("...[truncated]") ? (
-                      <Image 
-                        src={item.image_url} 
-                        alt="Preview" 
-                        fill 
-                        className="object-cover"
-                        onError={(e) => {
-                          // If image fails to load, hide it
-                          e.currentTarget.style.display = 'none'
-                        }}
-                      />
+                      // Check if it's a PDF
+                      item.image_url.startsWith("data:application/pdf") || item.image_url.toLowerCase().endsWith(".pdf") ? (
+                        <div className="w-full h-full flex items-center justify-center bg-yellow-500/20">
+                          <FileText className="w-5 h-5 text-yellow-400" />
+                        </div>
+                      ) : (
+                        <Image 
+                          src={item.image_url} 
+                          alt="Preview" 
+                          fill 
+                          className="object-cover"
+                          onError={(e) => {
+                            // If image fails to load, hide it
+                            e.currentTarget.style.display = 'none'
+                          }}
+                        />
+                      )
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-white/30 text-xs">
                         {item.image_url?.includes("...[truncated]") ? "..." : "📷"}
