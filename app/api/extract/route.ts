@@ -41,16 +41,26 @@ export async function POST(req: Request) {
         // NO TIMEOUT - Just wait for the response from n8n
         // We wait as long as it takes for n8n to process and respond
         console.log("[API/extract] Sending request to n8n webhook, waiting for response (no timeout)...")
+        console.log("[API/extract] Webhook URL:", webhookUrl)
         
         // Fetch without any timeout or abort signal - just wait for the response
-        const res = await fetch(webhookUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": reqContentType, // Forward the exact content-type with boundary
-          },
-          body: bodyBuffer, // Forward the raw body
-          // NO signal - we don't abort, we just wait
-        })
+        let res: Response
+        try {
+          res = await fetch(webhookUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": reqContentType, // Forward the exact content-type with boundary
+            },
+            body: bodyBuffer, // Forward the raw body
+            // NO signal - we don't abort, we just wait
+          })
+        } catch (fetchError: any) {
+          console.error("[API/extract] Fetch failed:", fetchError)
+          console.error("[API/extract] Fetch error name:", fetchError?.name)
+          console.error("[API/extract] Fetch error message:", fetchError?.message)
+          console.error("[API/extract] Fetch error cause:", fetchError?.cause)
+          throw new Error(`Failed to connect to webhook at ${webhookUrl}: ${fetchError?.message || fetchError?.toString()}`)
+        }
 
         console.log("[API/extract] Received response from n8n, status:", res.status, "ok:", res.ok)
 
@@ -116,7 +126,8 @@ export async function POST(req: Request) {
         console.error("[API/extract] FormData error details:", {
           name: formDataError.name,
           message: formDataError.message,
-          stack: formDataError.stack
+          stack: formDataError.stack,
+          cause: formDataError.cause
         })
         
         // Handle abort errors specifically
@@ -124,6 +135,17 @@ export async function POST(req: Request) {
           return NextResponse.json(
             { error: "Request was cancelled or timed out. Please try again." },
             { status: 499 }
+          )
+        }
+        
+        // Handle network/fetch errors with more detail
+        if (formDataError.message?.includes('Failed to connect') || formDataError.message?.includes('fetch failed')) {
+          return NextResponse.json(
+            { 
+              error: `Cannot reach webhook server. Please verify the webhook URL is accessible: ${webhookUrl}`,
+              details: formDataError.message
+            },
+            { status: 502 } // Bad Gateway
           )
         }
         
