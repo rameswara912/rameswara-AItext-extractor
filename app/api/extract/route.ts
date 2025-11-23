@@ -3,9 +3,9 @@ import { NextResponse } from "next/server"
 // Prefer localhost for client calls; 0.0.0.0 is a bind address, not a target
 const DEFAULT_WEBHOOK = "http://n8n-j400gwgokog0scs00o8w40gs.72.60.97.246.sslip.io/webhook/099bae8d-7d7d-49d7-8dbb-63d882e44153"
 
-// Allow up to 5 minutes for extraction (300 seconds)
-// This is the maximum for Vercel Pro, adjust for your deployment
-export const maxDuration = 300
+// No timeout - wait as long as needed for the response
+// Note: Netlify has platform limits, but we'll wait as long as possible
+export const maxDuration = 900 // 15 minutes (Netlify's maximum for serverless functions)
 
 export async function POST(req: Request) {
   try {
@@ -180,16 +180,11 @@ export async function POST(req: Request) {
       form.append("file", blob, fileName)
       form.append("body", JSON.stringify(body))
 
-      // Set a longer timeout for n8n processing (5 minutes)
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 300000) // 5 minutes
-
+      // NO TIMEOUT - Wait as long as needed for n8n to respond
       const res = await fetch(webhookUrl, {
         method: "POST",
         body: form,
-        signal: controller.signal,
-      }).finally(() => {
-        clearTimeout(timeoutId)
+        // NO signal - we wait indefinitely
       })
 
       const contentType = res.headers.get("content-type") || "application/json"
@@ -206,17 +201,12 @@ export async function POST(req: Request) {
     }
 
     // No file: just forward JSON
-    // Set a longer timeout for n8n processing (5 minutes)
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 300000) // 5 minutes
-
+    // NO TIMEOUT - Wait as long as needed for n8n to respond
     const res = await fetch(webhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
-      signal: controller.signal,
-    }).finally(() => {
-      clearTimeout(timeoutId)
+      // NO signal - we wait indefinitely
     })
 
     const contentType = res.headers.get("content-type") || "application/json"
@@ -236,14 +226,7 @@ export async function POST(req: Request) {
     console.error("[API/extract] Error message:", err.message)
     console.error("[API/extract] Error stack:", err.stack)
     
-    // Handle timeout errors gracefully
-    if (err.name === 'AbortError' || err.name === 'TimeoutError') {
-      console.error("[API/extract] Request timed out after 5 minutes")
-      return NextResponse.json(
-        { error: "Request timeout - extraction is taking longer than expected. The process may still be running." },
-        { status: 504 } // Gateway Timeout
-      )
-    }
+    // No timeout handling - we wait for the response
     
     // Handle network/connection errors
     const errorMsg = err?.message || "Proxy request failed"

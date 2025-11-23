@@ -328,7 +328,7 @@ export default function SelectionPanel({
         } else if (status === 401 || status === 403) {
           msg = "Unauthorized to call extraction service. Verify access settings."
         } else if (status === 504) {
-          msg = "Extraction timed out after 5 minutes. The process may still be running. Please try again or check n8n."
+          msg = "Extraction is taking longer than expected. The process is still running, please wait..."
         } else if (status === 499) {
           msg = "Request was cancelled. Please try again."
         }
@@ -384,10 +384,9 @@ export default function SelectionPanel({
         onExtractError?.(msg)
         toast.error(msg)
       } else if (err.name === 'AbortError' || err.name === 'TimeoutError') {
-        // If somehow we get an abort/timeout error, just log it but don't show error to user
-        // The server will eventually respond
-        console.warn("[extract] Request was aborted/timed out, but continuing to wait for server response...")
-        // Don't show error - just keep waiting
+        // No timeout errors - we wait indefinitely for the server response
+        console.warn("[extract] Request was aborted, but continuing to wait for server response...")
+        // Don't show error - just keep waiting silently
         return
       } else if (emsg) {
         msg = `Extraction failed: ${emsg}`
