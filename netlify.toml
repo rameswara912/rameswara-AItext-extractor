@@ -1,10 +1,8 @@
 [build]
   command = "npm run build"
-  # IMPORTANT: Do NOT set publish directory here or in Netlify UI
-  # The @netlify/plugin-nextjs plugin manages the publish directory automatically
-  # If you see "publish directory cannot be same as base directory" error,
-  # go to Netlify UI > Site settings > Build & deploy > Build settings
-  # and CLEAR the "Publish directory" field (leave it empty)
+  # This overrides the UI publish directory setting
+  # The plugin will still manage the actual publish output
+  publish = ".next"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
