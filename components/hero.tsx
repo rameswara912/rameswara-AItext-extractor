@@ -31,9 +31,19 @@ export default function Hero({ onImageUpload }: HeroProps) {
   useEffect(() => {
     if (!supabase) return
     let mounted = true
-    supabase.auth.getUser().then(({ data }) => {
+    supabase.auth.getUser().then(({ data, error }) => {
       if (!mounted) return
+      // Ignore auth errors - they're expected when no session exists
+      if (error && (error.message?.includes('Auth session missing') || error.name === 'AuthSessionMissingError')) {
+        setIsAuthed(false)
+        return
+      }
       setIsAuthed(!!data.user)
+    }).catch(() => {
+      // Silently handle any errors - no session is a valid state
+      if (mounted) {
+        setIsAuthed(false)
+      }
     })
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       setIsAuthed(!!session?.user)

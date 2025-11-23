@@ -88,6 +88,12 @@ export default function Home() {
         const { data: { user }, error: userError } = await supabase.auth.getUser()
         
         if (userError) {
+          // Silently handle missing session errors - they're expected when not logged in
+          if (userError.message?.includes('Auth session missing') || userError.name === 'AuthSessionMissingError') {
+            console.warn("[Page] No user found, skipping history save")
+            toast.warning("Not signed in. History will not be saved. Please sign in to save your extractions.")
+            return
+          }
           console.error("[Page] Failed to get user:", userError)
           toast.error(`Authentication error: ${userError.message}. History will not be saved.`)
           return

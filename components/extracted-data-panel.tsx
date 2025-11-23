@@ -291,7 +291,13 @@ export default function ExtractedDataPanel({
       const supabase = getSupabaseClient()
       const {
         data: { user },
+        error: userError,
       } = await supabase.auth.getUser()
+
+      // Silently handle missing session errors - they're expected when not logged in
+      if (userError && (userError.message?.includes('Auth session missing') || userError.name === 'AuthSessionMissingError')) {
+        throw new Error("You must be signed in to save to Supabase")
+      }
 
       if (!user) {
         throw new Error("You must be signed in to save to Supabase")

@@ -60,7 +60,12 @@ const mapRowToTemplate = (row: TemplateRow): Template => ({
 
 const fetchTemplatesFromSupabase = async (): Promise<Template[]> => {
   const supabase = getSupabaseClient()
-  const { data: userRes } = await supabase.auth.getUser()
+  const { data: userRes, error: userError } = await supabase.auth.getUser()
+  // Silently handle missing session errors - they're expected when not logged in
+  if (userError && (userError.message?.includes('Auth session missing') || userError.name === 'AuthSessionMissingError')) {
+    // Return empty templates when not logged in
+    return []
+  }
   const userId = userRes?.user?.id
   const query = supabase
     .from("templates")
@@ -79,7 +84,11 @@ const saveTemplateToSupabase = async (
   template: Omit<Template, "id" | "createdAt">
 ): Promise<boolean> => {
   const supabase = getSupabaseClient()
-  const { data: userRes } = await supabase.auth.getUser()
+  const { data: userRes, error: userError } = await supabase.auth.getUser()
+  // Silently handle missing session errors - they're expected when not logged in
+  if (userError && (userError.message?.includes('Auth session missing') || userError.name === 'AuthSessionMissingError')) {
+    return false
+  }
   const userId = userRes?.user?.id
   if (!userId) {
     console.error("Failed to save template: no authenticated user")
@@ -324,7 +333,9 @@ export default function SelectionPanel({
           msg = "Request was cancelled. Please try again."
         }
         
-        console.error("[extract] Error response received:", { status, msg, data })
+        // Use console.warn instead of console.error for expected API errors
+        // These are handled gracefully in the UI, so they shouldn't trigger Next.js error overlay
+        console.warn("[extract] Error response received:", { status, msg, data })
         onExtractError?.(msg)
         toast.error(msg)
         return
@@ -341,7 +352,8 @@ export default function SelectionPanel({
       // Check if data contains an error field
       if (data.error || data.message) {
         const errorMsg = data.error || data.message
-        console.error("[extract] Response contains error:", errorMsg)
+        // Use console.warn instead of console.error for expected API errors
+        console.warn("[extract] Response contains error:", errorMsg)
         onExtractError?.(errorMsg)
         toast.error(errorMsg)
         return

@@ -30,9 +30,19 @@ export default function AuthButton() {
 
     if (!supabase) return
     let mounted = true
-    supabase.auth.getUser().then(({ data }) => {
+    supabase.auth.getUser().then(({ data, error }) => {
       if (!mounted) return
+      // Ignore auth errors - they're expected when no session exists
+      if (error && (error.message?.includes('Auth session missing') || error.name === 'AuthSessionMissingError')) {
+        setUserEmail(null)
+        return
+      }
       setUserEmail(data.user?.email ?? null)
+    }).catch(() => {
+      // Silently handle any errors - no session is a valid state
+      if (mounted) {
+        setUserEmail(null)
+      }
     })
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       setUserEmail(session?.user?.email ?? null)

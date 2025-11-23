@@ -80,6 +80,15 @@ export default function HistorySidebar({ open, onClose, onSelect, refreshTrigger
         } = await supabase.auth.getUser()
         
         if (userErr) {
+          // Silently handle missing session errors - they're expected when not logged in
+          if (userErr.message?.includes('Auth session missing') || userErr.name === 'AuthSessionMissingError') {
+            if (isMounted) {
+              setError(null)
+              setLoading(false)
+            }
+            if (timeoutId) clearTimeout(timeoutId)
+            return
+          }
           console.error("[HistorySidebar] Error getting user:", userErr)
           if (isMounted) {
             setError(`Authentication error: ${userErr.message}`)
