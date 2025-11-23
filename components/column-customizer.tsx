@@ -88,7 +88,7 @@ export default function ColumnCustomizer({
 
   return (
     <div className="space-y-4 h-full flex flex-col">
-      <h4 className="text-white font-semibold text-sm flex-shrink-0">Customize Columns</h4>
+      <h4 className="text-white font-semibold text-sm flex-shrink-0 antialiased tracking-normal">Customize Columns</h4>
 
       <div className="space-y-2 flex-1 min-h-0 overflow-y-auto">
         <AnimatePresence>
@@ -104,29 +104,29 @@ export default function ColumnCustomizer({
               <div className="w-full px-4 py-3 flex items-center justify-between hover:bg-white/5 transition">
                 <button
                   onClick={() => setExpandedColumn(expandedColumn === col.id ? "" : col.id)}
-                  className="flex items-center gap-3 flex-1 text-left"
+                  className="flex items-center gap-3 flex-1 text-left min-w-0"
                 >
-                  <span className="text-xs text-gray-400 font-medium min-w-6">{idx + 1}.</span>
-                  <div className="text-left">
-                    <div className="text-white font-medium text-sm">{col.name}</div>
+                  <span className="text-xs text-gray-400 font-medium min-w-6 flex-shrink-0">{idx + 1}.</span>
+                  <div className="text-left min-w-0 flex-1">
+                    <div className="text-white font-medium text-sm truncate">{col.name}</div>
                     {col.instruction && <div className="text-xs text-gray-400 truncate">{col.instruction}</div>}
                   </div>
                 </button>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                   <button
                     onClick={(e) => {
                       e.stopPropagation()
                       handleDeleteColumn(col.id)
                     }}
                     disabled={columns.length === 1}
-                    className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded transition disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
                     title="Delete Column"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => setExpandedColumn(expandedColumn === col.id ? "" : col.id)}
-                    className="p-1 hover:bg-white/5 rounded transition"
+                    className="p-1 hover:bg-white/5 rounded transition flex-shrink-0"
                   >
                     <ChevronDown
                       className={`w-4 h-4 text-yellow-400 transition-transform ${

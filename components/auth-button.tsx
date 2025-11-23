@@ -5,12 +5,14 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { getSupabaseClient } from "../lib/supabase"
 import { GUEST_MODE, getGuestUserEmail } from "../lib/guest-mode"
+import { isAdmin } from "../lib/admin-check"
 
 export default function AuthButton() {
   const router = useRouter()
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [initError, setInitError] = useState<string | null>(null)
+  const [isAdminUser, setIsAdminUser] = useState<boolean>(false)
 
   const supabase = useMemo(() => {
     try {
@@ -25,6 +27,7 @@ export default function AuthButton() {
     // In guest mode, auto-authenticate
     if (GUEST_MODE) {
       setUserEmail(getGuestUserEmail())
+      setIsAdminUser(false)
       return
     }
 
@@ -35,17 +38,39 @@ export default function AuthButton() {
       // Ignore auth errors - they're expected when no session exists
       if (error && (error.message?.includes('Auth session missing') || error.name === 'AuthSessionMissingError')) {
         setUserEmail(null)
+        setIsAdminUser(false)
         return
       }
-      setUserEmail(data.user?.email ?? null)
+      const email = data.user?.email ?? null
+      setUserEmail(email)
+      
+      // Check if user is admin
+      if (email) {
+        isAdmin().then((admin) => {
+          if (mounted) {
+            setIsAdminUser(admin)
+          }
+        })
+      } else {
+        setIsAdminUser(false)
+      }
     }).catch(() => {
       // Silently handle any errors - no session is a valid state
       if (mounted) {
         setUserEmail(null)
+        setIsAdminUser(false)
       }
     })
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUserEmail(session?.user?.email ?? null)
+      const email = session?.user?.email ?? null
+      setUserEmail(email)
+      if (email) {
+        isAdmin().then((admin) => {
+          setIsAdminUser(admin)
+        })
+      } else {
+        setIsAdminUser(false)
+      }
     })
     return () => {
       sub?.subscription?.unsubscribe()
@@ -90,12 +115,14 @@ export default function AuthButton() {
           </>
         ) : (
           <div className="flex items-center gap-2">
-            <Link
-              href="/signup"
-              className="px-3 py-1.5 bg-white/10 hover:bg-white/15 text-white rounded-md border border-white/20 text-xs font-semibold transition"
-            >
-              Sign up
-            </Link>
+            {isAdminUser && (
+              <Link
+                href="/signup"
+                className="px-3 py-1.5 bg-white/10 hover:bg-white/15 text-white rounded-md border border-white/20 text-xs font-semibold transition"
+              >
+                Sign up
+              </Link>
+            )}
             <Link
               href="/login"
               className="px-3 py-1.5 bg-yellow-500 hover:bg-yellow-600 text-black rounded-md text-xs font-bold transition glow-border"

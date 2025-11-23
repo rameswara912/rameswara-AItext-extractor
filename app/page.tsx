@@ -7,10 +7,13 @@ import ExtractedDataPanel from "@/components/extracted-data-panel"
 import FloatingNavbar from "@/components/floating-navbar"
 import HistorySidebar from "@/components/history-sidebar"
 import dynamic from "next/dynamic"
-import { History } from "lucide-react"
+import { History, UserPlus } from "lucide-react"
 const AuthButton = dynamic(() => import("@/components/auth-button"), { ssr: false })
 import { getSupabaseClient } from "@/lib/supabase"
 import { toast } from "sonner"
+import { isAdmin } from "@/lib/admin-check"
+import Link from "next/link"
+import { motion } from "framer-motion"
 
 export default function Home() {
   const [uploadedImage, setUploadedImage] = useState<string | null>(null)
@@ -26,11 +29,51 @@ export default function Home() {
   const [prefillColumns, setPrefillColumns] = useState<any[] | undefined>(undefined)
   const [prefillAIInstruction, setPrefillAIInstruction] = useState<string | undefined>(undefined)
   const [historyRefreshTrigger, setHistoryRefreshTrigger] = useState(0)
+  const [isAdminUser, setIsAdminUser] = useState<boolean>(false)
 
   const uploadSectionRef = useRef<HTMLDivElement>(null)
   const selectSectionRef = useRef<HTMLDivElement>(null)
   const extractSectionRef = useRef<HTMLDivElement>(null)
   const supabase = getSupabaseClient()
+
+  // Check if user is admin
+  useEffect(() => {
+    let mounted = true
+    supabase.auth.getUser().then(({ data, error }) => {
+      if (!mounted) return
+      // Ignore auth errors - they're expected when no session exists
+      if (error && (error.message?.includes('Auth session missing') || error.name === 'AuthSessionMissingError')) {
+        setIsAdminUser(false)
+        return
+      }
+      if (data?.user) {
+        isAdmin().then((admin) => {
+          if (mounted) {
+            setIsAdminUser(admin)
+          }
+        })
+      } else {
+        setIsAdminUser(false)
+      }
+    }).catch(() => {
+      if (mounted) {
+        setIsAdminUser(false)
+      }
+    })
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        isAdmin().then((admin) => {
+          setIsAdminUser(admin)
+        })
+      } else {
+        setIsAdminUser(false)
+      }
+    })
+    return () => {
+      sub?.subscription?.unsubscribe()
+      mounted = false
+    }
+  }, [supabase])
 
   const handleStepChange = (step: "upload" | "select" | "extract") => {
     setCurrentStep(step)
@@ -230,25 +273,60 @@ export default function Home() {
       <div className="absolute inset-0 bg-gradient-to-tr from-yellow-500/5 via-transparent to-transparent pointer-events-none" />
 
       {/* Header removed for desktop app UX */}
-      <AuthButton />
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.2, ease: "easeOut" }}
+      >
+        <AuthButton />
+      </motion.div>
 
-      {/* Logo/Image at top center */}
-      <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50">
-        <img 
-          src="/image-removebg-preview.png" 
-          alt="Logo" 
-          className="h-12 w-auto object-contain rounded-lg border-2 border-white/20 shadow-lg"
-        />
-      </div>
+      {/* Create User button - top left (admin only, upload section only) */}
+      {isAdminUser && currentStep === "upload" && (
+        <motion.div
+          initial={{ opacity: 0, x: -50 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.5, delay: 0.3, ease: "easeOut" }}
+        >
+          <Link
+            href="/signup"
+            className="fixed top-3 left-3 z-50 px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-black rounded-lg font-semibold text-sm transition shadow-lg flex items-center gap-2 border border-yellow-400/30"
+            title="Create New User Account"
+          >
+            <UserPlus className="w-4 h-4" />
+            <span className="hidden sm:inline">Create User</span>
+            <span className="sm:hidden">Create</span>
+          </Link>
+        </motion.div>
+      )}
+
+      {/* Logo/Image at top center (upload page only) */}
+      {currentStep === "upload" && (
+        <motion.div
+          initial={{ opacity: 0, y: -30, scale: 0.8 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.6, delay: 0.1, ease: "easeOut" }}
+          className="fixed top-2 sm:top-3 md:top-4 left-1/2 -translate-x-1/2 z-50"
+        >
+          <img 
+            src="/image-removebg-preview.png" 
+            alt="Logo" 
+            className="h-8 sm:h-10 md:h-12 lg:h-14 w-auto object-contain rounded-lg border-2 border-white/20 shadow-lg"
+          />
+        </motion.div>
+      )}
 
       {/* History toggle button on the left */}
-      <button
+      <motion.button
+        initial={{ opacity: 0, x: -50 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.5, delay: 0.4, ease: "easeOut" }}
         onClick={() => setHistoryOpen((v) => !v)}
         className="fixed left-3 top-1/2 -translate-y-1/2 z-50 p-3 rounded-full bg-white/10 border border-white/20 text-white hover:bg-white/15 transition shadow-2xl"
         title="History"
       >
         <History className="w-5 h-5" />
-      </button>
+      </motion.button>
 
       {/* Floating history sidebar */}
       <HistorySidebar 

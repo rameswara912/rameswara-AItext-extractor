@@ -40,21 +40,13 @@ export default function HistorySidebar({ open, onClose, onSelect, refreshTrigger
 
   useEffect(() => {
     let isMounted = true
-    let timeoutId: NodeJS.Timeout | null = null
     
     const load = async () => {
       try {
         setLoading(true)
         setError(null)
         
-        // Set a timeout to prevent infinite loading (increased to 30 seconds)
-        timeoutId = setTimeout(() => {
-          if (isMounted) {
-            console.error("[HistorySidebar] Loading timeout after 30 seconds")
-            setError("Loading timeout. The database might be slow. Please try refreshing.")
-            setLoading(false)
-          }
-        }, 30000)
+        // NO TIMEOUT - Wait as long as needed for the database response
         
         // Initialize Supabase client with error handling
         let supabase;
@@ -63,7 +55,6 @@ export default function HistorySidebar({ open, onClose, onSelect, refreshTrigger
           console.log("[HistorySidebar] Supabase client initialized successfully")
         } catch (initError: any) {
           console.error("[HistorySidebar] Failed to initialize Supabase client:", initError)
-          if (timeoutId) clearTimeout(timeoutId)
           if (isMounted) {
             const errorMsg = initError?.message || "Failed to initialize database connection"
             setError(`Configuration error: ${errorMsg}. Please check your environment variables.`)
@@ -86,7 +77,6 @@ export default function HistorySidebar({ open, onClose, onSelect, refreshTrigger
               setError(null)
               setLoading(false)
             }
-            if (timeoutId) clearTimeout(timeoutId)
             return
           }
           console.error("[HistorySidebar] Error getting user:", userErr)
@@ -94,7 +84,6 @@ export default function HistorySidebar({ open, onClose, onSelect, refreshTrigger
             setError(`Authentication error: ${userErr.message}`)
             setLoading(false)
           }
-          if (timeoutId) clearTimeout(timeoutId)
           return
         }
         
@@ -105,7 +94,6 @@ export default function HistorySidebar({ open, onClose, onSelect, refreshTrigger
             setError("Sign in to view your history")
             setLoading(false)
           }
-          if (timeoutId) clearTimeout(timeoutId)
           return
         }
 
@@ -130,17 +118,42 @@ export default function HistorySidebar({ open, onClose, onSelect, refreshTrigger
           const queryTime = Date.now() - startTime
           console.log(`[HistorySidebar] Query completed in ${queryTime}ms`)
           
-          if (timeoutId) clearTimeout(timeoutId)
-          
+          // Check if error exists and has meaningful content
           if (error) {
-            console.error("[HistorySidebar] Error loading history:", error)
-            console.error("[HistorySidebar] Error code:", error.code)
-            console.error("[HistorySidebar] Error message:", error.message)
+            // Safely log error - handle empty objects or missing properties
+            const errorMessage = error?.message || error?.toString() || 'Unknown error'
+            const errorCode = error?.code || 'NO_CODE'
+            const errorDetails = JSON.stringify(error, null, 2)
+            
+            // Only log if error has meaningful content (not just empty object)
+            if (errorMessage !== 'Unknown error' || Object.keys(error).length > 0) {
+              console.error("[HistorySidebar] Error loading history:", {
+                message: errorMessage,
+                code: errorCode,
+                details: errorDetails,
+                fullError: error
+              })
+            } else {
+              // If error is empty object, just log a warning
+              console.warn("[HistorySidebar] Received empty error object, treating as success")
+            }
+            
             if (isMounted) {
-              setError(`Failed to load history: ${error.message || 'Unknown error'}`)
+              // Only set error state if we have a meaningful error message
+              if (errorMessage !== 'Unknown error' || Object.keys(error).length > 0) {
+                setError(`Failed to load history: ${errorMessage}`)
+              } else {
+                // If error is empty, treat as success and continue
+                setItems((data || []) as ExtractionRow[])
+                setError(null)
+              }
               setLoading(false)
             }
-            return
+            
+            // Only return early if we have a real error
+            if (errorMessage !== 'Unknown error' || Object.keys(error).length > 0) {
+              return
+            }
           }
           
           console.log("[HistorySidebar] Loaded history items:", data?.length || 0, "items")
@@ -151,12 +164,22 @@ export default function HistorySidebar({ open, onClose, onSelect, refreshTrigger
           if (isMounted) {
             setItems((data || []) as ExtractionRow[])
             setLoading(false)
+            setError(null) // Clear any previous errors on success
           }
         } catch (queryError: any) {
-          console.error("[HistorySidebar] Exception during query:", queryError)
-          if (timeoutId) clearTimeout(timeoutId)
+          // Safely handle exceptions - check if error has meaningful content
+          const errorMessage = queryError?.message || queryError?.toString() || 'Network error'
+          const errorName = queryError?.name || 'UnknownError'
+          
+          console.error("[HistorySidebar] Exception during query:", {
+            name: errorName,
+            message: errorMessage,
+            stack: queryError?.stack,
+            fullError: queryError
+          })
+          
           if (isMounted) {
-            setError(`Query failed: ${queryError?.message || 'Network error'}`)
+            setError(`Query failed: ${errorMessage}`)
             setLoading(false)
           }
           return
@@ -219,12 +242,10 @@ export default function HistorySidebar({ open, onClose, onSelect, refreshTrigger
           return () => {
             console.log("[HistorySidebar] Cleaning up realtime subscription")
             channel.unsubscribe()
-            if (timeoutId) clearTimeout(timeoutId)
           }
         }
       } catch (e: any) {
         console.error("[HistorySidebar] Exception in load:", e)
-        if (timeoutId) clearTimeout(timeoutId)
         if (isMounted) {
           setError(e?.message || "Failed to load history")
           setLoading(false)
@@ -250,7 +271,6 @@ export default function HistorySidebar({ open, onClose, onSelect, refreshTrigger
     }
     return () => {
       isMounted = false
-      if (timeoutId) clearTimeout(timeoutId)
       cleanup?.()
     }
   }, [open, refreshKey]) // Reload when refreshKey changes

@@ -8,6 +8,7 @@ import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import { getSupabaseClient } from "../lib/supabase"
 import Link from "next/link"
+import { motion } from "framer-motion"
 
 interface HeroProps {
   onImageUpload: (imageUrl: string) => void
@@ -141,48 +142,104 @@ export default function Hero({ onImageUpload }: HeroProps) {
     }
   }
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.15,
+        delayChildren: 0.2,
+      },
+    },
+  }
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.5,
+        ease: "easeOut",
+      },
+    },
+  }
+
+  const iconVariants = {
+    hidden: { opacity: 0, scale: 0.5, rotate: -180 },
+    visible: {
+      opacity: 1,
+      scale: 1,
+      rotate: 0,
+      transition: {
+        duration: 0.6,
+        ease: "easeOut",
+      },
+    },
+  }
+
   return (
     <section className="w-full h-full flex items-center justify-center px-4">
       <div className="max-w-2xl w-full">
-        <div
+        <motion.div
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
+          initial="hidden"
+          animate="visible"
+          variants={containerVariants}
           className={`glass glass-hover p-8 md:p-12 text-center cursor-pointer transition-all ${
             isDragging ? "border-yellow-500 bg-white/10 glow-border" : ""
           }`}
         >
-          <div className="flex justify-center mb-6">
+          <motion.div 
+            className="flex justify-center mb-6"
+            variants={iconVariants}
+          >
             <div className="p-4 bg-gradient-to-br from-yellow-400/20 to-yellow-600/20 rounded-full">
               <Upload className="w-8 h-8 text-yellow-400" />
             </div>
-          </div>
+          </motion.div>
 
-          <h2 className="gradient-text text-2xl md:text-3xl font-bold mb-3">Extract Data from Tables</h2>
-          <p className="text-white/60 mb-8">
+          <motion.h2 
+            className="gradient-text text-2xl md:text-3xl font-bold mb-3"
+            variants={itemVariants}
+          >
+            Extract Data from Tables
+          </motion.h2>
+          
+          <motion.p 
+            className="text-white/60 mb-8"
+            variants={itemVariants}
+          >
             {isAuthed ? "Upload an image or PDF (≤ 10MB) and AI will extract the table data" : "Sign in to upload an image or PDF (≤ 10MB)"}
-          </p>
+          </motion.p>
 
-          {isAuthed ? (
-            <label className="inline-block">
-              <input type="file" accept="image/jpeg,image/png,application/pdf" onChange={handleFileSelect} className="hidden" />
-              <span className="px-8 py-3 bg-yellow-500 hover:bg-yellow-600 text-black font-semibold rounded-lg cursor-pointer transition glow-border inline-block">
-                Choose Image
-              </span>
-            </label>
-          ) : (
-            <Link
-              href="/login"
-              className="px-8 py-3 bg-yellow-500 hover:bg-yellow-600 text-black font-semibold rounded-lg transition glow-border inline-block"
-            >
-              Sign in to Upload
-            </Link>
-          )}
+          <motion.div variants={itemVariants}>
+            {isAuthed ? (
+              <label className="inline-block">
+                <input type="file" accept="image/jpeg,image/png,application/pdf" onChange={handleFileSelect} className="hidden" />
+                <span className="px-8 py-3 bg-yellow-500 hover:bg-yellow-600 text-black font-semibold rounded-lg cursor-pointer transition glow-border inline-block">
+                  Choose Image
+                </span>
+              </label>
+            ) : (
+              <Link
+                href="/login"
+                className="px-8 py-3 bg-yellow-500 hover:bg-yellow-600 text-black font-semibold rounded-lg transition glow-border inline-block"
+              >
+                Sign in to Upload
+              </Link>
+            )}
+          </motion.div>
 
-          <p className="text-white/40 text-sm mt-6">
+          <motion.p 
+            className="text-white/40 text-sm mt-6"
+            variants={itemVariants}
+          >
             {isAuthed ? "or drag and drop your image/PDF here" : "Sign in first, then drag and drop your image/PDF here"}
-          </p>
-        </div>
+          </motion.p>
+        </motion.div>
       </div>
     </section>
   )

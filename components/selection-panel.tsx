@@ -542,7 +542,7 @@ export default function SelectionPanel({
             </button>
             <button
               onClick={handleExtractData}
-              className={`flex-1 px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-black rounded font-bold text-sm transition shadow-lg hover:shadow-yellow-500/50 ${isExtracting ? "opacity-60 cursor-not-allowed" : ""}`}
+              className={`flex-1 px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-black rounded font-bold text-sm transition ${isExtracting ? "opacity-60 cursor-not-allowed" : ""}`}
               aria-disabled={!!isExtracting}
               title={isExtracting ? "Extraction in progress" : undefined}
             >
@@ -570,10 +570,12 @@ export default function SelectionPanel({
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="fixed inset-0 z-50 flex items-center justify-center p-4"
-              onClick={(e) => e.stopPropagation()}
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
             >
-              <div className="glass glow-border rounded-lg p-6 max-w-4xl w-full max-h-[80vh] flex flex-col">
+              <div 
+                className="glass glow-border rounded-lg p-6 max-w-4xl w-full max-h-[80vh] flex flex-col pointer-events-auto"
+                onClick={(e) => e.stopPropagation()}
+              >
                 {/* Header */}
                 <div className="flex items-center justify-between mb-4 flex-shrink-0">
                   <h3 className="text-yellow-400 font-semibold text-xl">Select a Template</h3>
@@ -664,10 +666,12 @@ export default function SelectionPanel({
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="fixed inset-0 z-50 flex items-center justify-center p-4"
-              onClick={(e) => e.stopPropagation()}
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
             >
-              <div className="glass glow-border rounded-lg p-6 w-full max-w-md">
+              <div 
+                className="glass glow-border rounded-lg p-6 w-full max-w-md pointer-events-auto"
+                onClick={(e) => e.stopPropagation()}
+              >
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-yellow-400 font-semibold text-xl">Save Template</h3>
                   <button onClick={() => setShowSaveNameModal(false)} className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded transition">

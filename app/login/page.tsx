@@ -5,6 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { getSupabaseClient } from "../../lib/supabase";
+import { isAdmin } from "../../lib/admin-check";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -20,6 +21,7 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [isAdminUser, setIsAdminUser] = useState<boolean>(false);
 
   useEffect(() => {
     if (!supabase) return;
@@ -29,17 +31,39 @@ export default function LoginPage() {
       // Ignore auth errors - they're expected when no session exists
       if (result.error && (result.error.message?.includes('Auth session missing') || result.error.name === 'AuthSessionMissingError')) {
         setUserEmail(null);
+        setIsAdminUser(false);
         return;
       }
-      setUserEmail(result.data.user?.email ?? null);
+      const email = result.data.user?.email ?? null;
+      setUserEmail(email);
+      
+      // Check if user is admin
+      if (email) {
+        isAdmin().then((admin) => {
+          if (mounted) {
+            setIsAdminUser(admin);
+          }
+        });
+      } else {
+        setIsAdminUser(false);
+      }
     }).catch(() => {
       // Silently handle any errors - no session is a valid state
       if (mounted) {
         setUserEmail(null);
+        setIsAdminUser(false);
       }
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUserEmail(session?.user?.email ?? null);
+      const email = session?.user?.email ?? null;
+      setUserEmail(email);
+      if (email) {
+        isAdmin().then((admin) => {
+          setIsAdminUser(admin);
+        });
+      } else {
+        setIsAdminUser(false);
+      }
     });
     return () => {
       sub?.subscription?.unsubscribe();
@@ -65,6 +89,18 @@ export default function LoginPage() {
       setError(msg);
       toast.error(msg);
       return;
+    }
+
+    // If trying to sign up, check if current user is admin
+    if (mode === "signup") {
+      const adminCheck = await isAdmin();
+      if (!adminCheck) {
+        const msg = "Only administrators can create new accounts. Please contact an administrator.";
+        setError(msg);
+        toast.error(msg);
+        setLoading(false);
+        return;
+      }
     }
 
     const action = mode === "signin"
@@ -192,7 +228,10 @@ export default function LoginPage() {
             {loading ? (mode === "signin" ? "Signing in…" : "Creating account…") : mode === "signin" ? "Sign in" : "Create account"}
           </button>
           <div className="mt-2 flex items-center justify-between">
-            <a href="/signup" className="text-yellow-400 text-xs">Create account</a>
+            {isAdminUser && (
+              <a href="/signup" className="text-yellow-400 text-xs">Create account</a>
+            )}
+            {!isAdminUser && <div></div>}
             <button onClick={handleResetPassword} type="button" className="text-yellow-400 text-xs">Forgot password?</button>
           </div>
         </form>
