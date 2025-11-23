@@ -11,6 +11,11 @@ const nextConfig = {
   // Use relative path to avoid hardcoded absolute paths
   outputFileTracingRoot: path.join(__dirname, '..'),
   
+  // Disable Turbopack to use webpack (which handles native modules better)
+  experimental: {
+    turbo: false,
+  },
+  
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -39,7 +44,7 @@ const nextConfig = {
           source: "/api/extract",
           destination:
             process.env.WEBHOOK_URL ||
-            "http://localhost:5678/webhook/099bae8d-7d7d-49d7-8dbb-63d882e44153",
+            "http://n8n-j400gwgokog0scs00o8w40gs.72.60.97.246.sslip.io/webhook/099bae8d-7d7d-49d7-8dbb-63d882e44153",
         },
       ]
     }

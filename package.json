@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start -p 3000",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "postinstall": "node -e \"try { require('lightningcss-linux-x64-gnu'); console.log('✓ lightningcss native module verified'); } catch(e) { console.warn('⚠ lightningcss native module not found:', e.message); }\""
   },
   "dependencies": {
     "@emotion/is-prop-valid": "latest",
@@ -64,7 +65,8 @@
     "zod": "3.25.76",
     "@tailwindcss/postcss": "^4.1.9",
     "postcss": "^8.5",
-    "tailwindcss": "^4.1.9"
+    "tailwindcss": "^4.1.9",
+    "lightningcss-linux-x64-gnu": "^1.30.2"
   },
   "devDependencies": {
     "@types/node": "^22",

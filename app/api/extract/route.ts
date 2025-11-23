@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 
 // Prefer localhost for client calls; 0.0.0.0 is a bind address, not a target
-const DEFAULT_WEBHOOK = "http://localhost:5678/webhook/099bae8d-7d7d-49d7-8dbb-63d882e44153"
+const DEFAULT_WEBHOOK = "http://n8n-j400gwgokog0scs00o8w40gs.72.60.97.246.sslip.io/webhook/099bae8d-7d7d-49d7-8dbb-63d882e44153"
 
 // Allow up to 5 minutes for extraction (300 seconds)
 // This is the maximum for Vercel Pro, adjust for your deployment
