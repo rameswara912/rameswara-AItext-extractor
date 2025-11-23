@@ -10,7 +10,10 @@ export const maxDuration = 300
 export async function POST(req: Request) {
   try {
     const webhookUrl = process.env.WEBHOOK_URL || DEFAULT_WEBHOOK
-    console.log("[API/extract] Received request, webhook URL:", webhookUrl)
+    console.log("[API/extract] Received request")
+    console.log("[API/extract] WEBHOOK_URL env var:", process.env.WEBHOOK_URL || "NOT SET (using default)")
+    console.log("[API/extract] DEFAULT_WEBHOOK:", DEFAULT_WEBHOOK)
+    console.log("[API/extract] Using webhook URL:", webhookUrl)
     const reqContentType = req.headers.get("content-type") || ""
 
     // 1) If the client sent multipart/form-data, forward it as-is
@@ -143,7 +146,9 @@ export async function POST(req: Request) {
           return NextResponse.json(
             { 
               error: `Cannot reach webhook server. Please verify the webhook URL is accessible: ${webhookUrl}`,
-              details: formDataError.message
+              details: formDataError.message,
+              envVar: process.env.WEBHOOK_URL || "NOT SET",
+              defaultUsed: !process.env.WEBHOOK_URL
             },
             { status: 502 } // Bad Gateway
           )
